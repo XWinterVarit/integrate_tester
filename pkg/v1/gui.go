@@ -2,13 +2,17 @@ package v1
 
 import (
 	"fmt"
+	"image/color"
 	"log"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -27,19 +31,37 @@ func RunGUI(t *Tester) {
 		statusData := binding.NewString()
 		_ = statusData.Set("Not Run")
 
-		statusLabel := widget.NewLabelWithData(statusData)
-		statusLabel.TextStyle = fyne.TextStyle{Italic: true}
+		statusText := canvas.NewText("Not Run", theme.ForegroundColor())
+		statusText.TextStyle = fyne.TextStyle{Italic: true}
+		statusText.Alignment = fyne.TextAlignTrailing
+
+		statusData.AddListener(binding.NewDataListener(func() {
+			val, _ := statusData.Get()
+			statusText.Text = val
+			if val == "PASSED" {
+				statusText.Color = color.NRGBA{R: 0, G: 180, B: 0, A: 255} // Green
+			} else if strings.HasPrefix(val, "FAILED") {
+				statusText.Color = color.NRGBA{R: 200, G: 0, B: 0, A: 255} // Red
+			} else {
+				statusText.Color = theme.ForegroundColor()
+			}
+			statusText.Refresh()
+		}))
 
 		runBtn := widget.NewButton("Run", func() {
 			_ = statusData.Set("Running...")
 			// Run in a separate goroutine to avoid blocking the UI
 			go func() {
 				err := t.RunStageByName(stageName)
-				if err != nil {
-					_ = statusData.Set(fmt.Sprintf("FAILED: %v", err))
-				} else {
-					_ = statusData.Set("PASSED")
-				}
+
+				// Update status on UI thread to ensure canvas.Text modifications are safe
+				fyne.Do(func() {
+					if err != nil {
+						_ = statusData.Set(fmt.Sprintf("FAILED: %v", err))
+					} else {
+						_ = statusData.Set("PASSED")
+					}
+				})
 			}()
 		})
 
@@ -47,7 +69,7 @@ func RunGUI(t *Tester) {
 		row := container.NewHBox(
 			widget.NewLabel(stageName),
 			layout.NewSpacer(),
-			statusLabel,
+			statusText,
 			runBtn,
 		)
 		stageControls = append(stageControls, row)
@@ -97,13 +119,15 @@ func RunGUI(t *Tester) {
 			}
 
 			label := o.(*widget.Label)
-			label.SetText(fmt.Sprintf("%s [%s] %s", icon, entry.Type, entry.Summary))
+			text := fmt.Sprintf("%s [%s] %s", icon, entry.Type, entry.Summary)
 
 			if entry.Type == LogTypeStage {
 				label.TextStyle = fyne.TextStyle{Bold: true}
 			} else {
 				label.TextStyle = fyne.TextStyle{}
+				text = "   " + text // Add left padding for non-stage items
 			}
+			label.SetText(text)
 		},
 	)
 
