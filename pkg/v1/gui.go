@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
@@ -24,18 +25,21 @@ func RunGUI(t *Tester) {
 	for _, stage := range t.Stages {
 		stageName := stage.Name // Capture variable
 
-		statusLabel := widget.NewLabel("Not Run")
+		statusData := binding.NewString()
+		_ = statusData.Set("Not Run")
+
+		statusLabel := widget.NewLabelWithData(statusData)
 		statusLabel.TextStyle = fyne.TextStyle{Italic: true}
 
 		runBtn := widget.NewButton("Run", func() {
-			statusLabel.SetText("Running...")
+			_ = statusData.Set("Running...")
 			// Run in a separate goroutine to avoid blocking the UI
 			go func() {
 				err := t.RunStageByName(stageName)
 				if err != nil {
-					statusLabel.SetText(fmt.Sprintf("FAILED: %v", err))
+					_ = statusData.Set(fmt.Sprintf("FAILED: %v", err))
 				} else {
-					statusLabel.SetText("PASSED")
+					_ = statusData.Set("PASSED")
 				}
 			}()
 		})
