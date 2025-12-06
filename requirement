@@ -1,0 +1,78 @@
+
+I want a lib for integration test that compile go code like in the example Integration Test 1
+and run basic GUI(please pick lib that easy to use and maintain, and can run in any os) and list stages, that a user can click to run and debug. given that stage don't need to be run consequently.
+
+the go lib provide a way to manipulate database, mock server, and interact with app server, and the expected result. in the easiest way
+as possible.
+
+the code of the lib should be easy to read and understand, also can be organized into multiple packages and files. all of the code is under V1
+for able to update in the future without impact old test cases.
+the GUI code also should be seperated from other code.
+The developer of test case should not need to know how the lib work and how to write GUI code.
+
+it is like robot framework, but for go, for easy for go-developer to write and maintain integration test.
+
+Feature Concept
+
+- Database SQL
+    - Connect
+    - Setup Table (isReplace bool,schema, table name, field (key, type), indexes)
+    - Drop Table
+    - Clean Table
+    - Setup Table From Another (isReplace bool, table 1 connection 1, table 2 connection 2)
+
+    - Insert Data
+    - Replace Data
+    - Update Data
+    - Delete Data
+    - Query Data
+
+- Request
+
+- Mock Server
+    - run mock server
+    - update mock server
+
+- App Server
+    - run app server
+
+- Expection
+    - response expection
+
+- Stage
+
+Example
+
+func IntegrationTest1
+
+    Stage("Setup")
+
+    dbClientA := connect(127.0.0.1:22222, a, b, c, d...)
+
+    setupTable(dbClientA, "table1", true, Fields[{"id", string}, {"name", string}], indexes[{"id", "name"}])
+    setupTable(dbClientA, "table2", true, Fields[{"id", string}, {"name", string}], indexes[{"id", "name"}])
+
+    ReplaceData(dbClientA, "table1", {"1", "a"})
+    ReplaceData(dbClientA, "table2", {"2", "b"})
+
+    mockA, RunMockServer(port, paths[
+        "/a": func(req Request) Response { return Response{200, "a"} },
+        "/b": func(req Request) Response { return Response{200, "b"} }
+    ])
+
+    RunAppServer(path and argument options)
+
+    Stage("Case 1")
+
+    resp := Request("http://localhost:8080/a")
+
+    ExpectHeader(resp, ....)
+    ExpectJsonBody(resp, ....)
+
+    Stage("Case 2")
+
+    UpdateMockServer(mockA, paths[
+        "/a": func(req Request) Response { return Response{200, "c"} }
+    ])
+
+
