@@ -20,6 +20,9 @@ type MockServer struct {
 // port can be ":8080" or just "8080".
 func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer {
 	RecordAction(fmt.Sprintf("Mock Run: %s", port), func() { RunMockServer(port, handlers) })
+	if IsDryRun() {
+		return &MockServer{}
+	}
 	if len(port) > 0 && port[0] != ':' {
 		port = ":" + port
 	}
@@ -51,6 +54,12 @@ func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer
 // Usually replacing the map is safer/cleaner for a "stage" change.
 func UpdateMockServer(ms *MockServer, handlers map[string]MockHandlerFunc) {
 	RecordAction("Mock Update", func() { UpdateMockServer(ms, handlers) })
+	if IsDryRun() {
+		return
+	}
+	if ms.server == nil {
+		panic("MockServer is not running (possibly running a DryRun captured action without real execution context)")
+	}
 	Log(LogTypeMock, "Updating server handlers", "")
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

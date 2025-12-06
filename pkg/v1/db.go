@@ -26,6 +26,9 @@ type DBClient struct {
 // Driver should be imported in the main application.
 func Connect(driverName, dataSourceName string) *DBClient {
 	RecordAction(fmt.Sprintf("DB Connect: %s", driverName), func() { Connect(driverName, dataSourceName) })
+	if IsDryRun() {
+		return &DBClient{}
+	}
 	Logf(LogTypeDB, "Connecting to %s", driverName)
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
@@ -41,6 +44,12 @@ func Connect(driverName, dataSourceName string) *DBClient {
 // SetupTable sets up a table.
 func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, indexes []Index) {
 	RecordAction(fmt.Sprintf("DB SetupTable: %s", tableName), func() { c.SetupTable(tableName, isReplace, fields, indexes) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected (possibly running a DryRun captured action without real execution context)")
+	}
 	Logf(LogTypeDB, "Setting up table '%s' (Replace=%v)", tableName, isReplace)
 	if isReplace {
 		c.DropTable(tableName)
@@ -72,6 +81,12 @@ func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, 
 // DropTable drops a table.
 func (c *DBClient) DropTable(tableName string) {
 	RecordAction(fmt.Sprintf("DB DropTable: %s", tableName), func() { c.DropTable(tableName) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected")
+	}
 	Logf(LogTypeDB, "Dropping table '%s'", tableName)
 	_, err := c.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	if err != nil {
@@ -82,6 +97,12 @@ func (c *DBClient) DropTable(tableName string) {
 // CleanTable deletes all data from a table.
 func (c *DBClient) CleanTable(tableName string) {
 	RecordAction(fmt.Sprintf("DB CleanTable: %s", tableName), func() { c.CleanTable(tableName) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected")
+	}
 	Logf(LogTypeDB, "Cleaning table '%s'", tableName)
 	_, err := c.DB.Exec(fmt.Sprintf("DELETE FROM %s", tableName))
 	if err != nil {
@@ -107,6 +128,12 @@ func SetupTableFromAnother(destClient *DBClient, destTable string, srcClient *DB
 // Data is assumed to be a list of values matching columns order.
 func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
 	RecordAction(fmt.Sprintf("DB ReplaceData: %s", tableName), func() { c.ReplaceData(tableName, values) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected")
+	}
 	Log(LogTypeDB, fmt.Sprintf("Replacing data in '%s'", tableName), fmt.Sprintf("%v", values))
 	// We need to know placeholders.
 	placeholders := make([]string, len(values))
@@ -132,6 +159,12 @@ func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
 // QueryData is a helper to run queries.
 func (c *DBClient) QueryData(query string, args ...interface{}) *sql.Rows {
 	RecordAction("DB QueryData", func() { c.QueryData(query, args...) })
+	if IsDryRun() {
+		return nil
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected")
+	}
 	Log(LogTypeDB, "Query Data", fmt.Sprintf("Query: %s\nArgs: %v", query, args))
 	rows, err := c.DB.Query(query, args...)
 	if err != nil {

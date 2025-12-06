@@ -31,7 +31,16 @@ var (
 	actionMu sync.Mutex
 	// actionHandlers are notified when actions list updates
 	actionHandlers []func()
+	// isDryRun indicates if the tester is in discovery mode
+	isDryRun bool
 )
+
+// IsDryRun checks if the tester is in dry run mode.
+func IsDryRun() bool {
+	actionMu.Lock()
+	defer actionMu.Unlock()
+	return isDryRun
+}
 
 // RecordAction registers an operation for the current stage.
 func RecordAction(summary string, fn func()) {
@@ -140,4 +149,33 @@ func (t *Tester) RunStageByName(name string) (err error) {
 	}()
 	fn()
 	return nil
+}
+
+// DryRunAll executes all stages in dry run mode to discover actions.
+func (t *Tester) DryRunAll() {
+	for _, s := range t.Stages {
+		t.DryRunStage(s)
+	}
+}
+
+// DryRunStage executes a single stage in dry run mode.
+func (t *Tester) DryRunStage(s StageDef) {
+	actionMu.Lock()
+	currentStage = s.Name
+	isRecording = true
+	isDryRun = true
+	stageActions[s.Name] = []Action{}
+	actionMu.Unlock()
+
+	defer func() {
+		actionMu.Lock()
+		isRecording = false
+		isDryRun = false
+		currentStage = ""
+		actionMu.Unlock()
+		// Catch panics during dry run
+		recover()
+	}()
+
+	s.Func()
 }

@@ -12,6 +12,9 @@ import (
 // We use a different name than "Request" because "Request" is already a type.
 func SendRequest(url string) Response {
 	RecordAction(fmt.Sprintf("Request: %s", url), func() { SendRequest(url) })
+	if IsDryRun() {
+		return Response{}
+	}
 	Logf(LogTypeRequest, "Sending GET request to: %s", url)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -43,6 +46,9 @@ func SendRequest(url string) Response {
 
 // ExpectHeader asserts that the response has the expected header.
 func ExpectHeader(resp Response, key, value string) {
+	if IsDryRun() {
+		return
+	}
 	if got, ok := resp.Header[key]; !ok || got != value {
 		panic(fmt.Sprintf("ExpectHeader failed: expected %s=%s, got %s", key, value, got))
 	}
@@ -52,6 +58,9 @@ func ExpectHeader(resp Response, key, value string) {
 // ExpectJsonBody asserts that the response body matches the expected JSON.
 // This is a simple implementation that compares unmarshaled objects.
 func ExpectJsonBody(resp Response, expectedJson interface{}) {
+	if IsDryRun() {
+		return
+	}
 	var got interface{}
 	if err := json.Unmarshal([]byte(resp.Body), &got); err != nil {
 		panic(fmt.Sprintf("ExpectJsonBody failed: response body is not valid JSON: %v. Body: %s", err, resp.Body))

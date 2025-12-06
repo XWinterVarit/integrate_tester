@@ -350,6 +350,9 @@ func RunGUI(t *Tester) {
 	myWindow.SetContent(split)
 	myWindow.Resize(fyne.NewSize(1000, 700))
 
+	// Pre-populate actions via Dry Run
+	t.DryRunAll()
+
 	log.Println("Starting GUI window...")
 	myWindow.ShowAndRun()
 }
