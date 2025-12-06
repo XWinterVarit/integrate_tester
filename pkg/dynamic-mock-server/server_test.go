@@ -57,8 +57,8 @@ func TestDynamicMockServer(t *testing.T) {
 
 	t.Run("RegisterRouteAndCall", func(t *testing.T) {
 		err := client.RegisterRoute(mockPort, "GET", "/test", []ResponseFuncConfig{
-			SetStatusCode(200),
-			SetJsonBody(`{"message": "hello"}`),
+			SetStatusCode("", 200),
+			SetJsonBody("", `{"message": "hello"}`),
 		})
 		if err != nil {
 			t.Fatalf("RegisterRoute failed: %v", err)
@@ -92,8 +92,8 @@ func TestDynamicMockServer(t *testing.T) {
 
 			GenerateRandomString(10, "RAND_STR"),
 
-			SetJsonBody(`{"auth": "{{.AUTH_OK}}", "rand": "{{.RAND_STR}}"}`),
-			SetStatusCode(201),
+			SetJsonBody("", `{"auth": "{{.AUTH_OK}}", "rand": "{{.RAND_STR}}"}`),
+			SetStatusCode("", 201),
 		})
 		if err != nil {
 			t.Fatalf("RegisterRoute failed: %v", err)
@@ -130,8 +130,8 @@ func TestDynamicMockServer(t *testing.T) {
 		err := client.RegisterRoute(mockPort, "GET", "/gen", []ResponseFuncConfig{
 			GenerateRandomInt(10, 100, "R_INT"),
 			ConvertToString("R_INT"),
-			SetJsonBody(`{"val": "{{.R_INT}}"}`),
-			SetStatusCode(200),
+			SetJsonBody("", `{"val": "{{.R_INT}}"}`),
+			SetStatusCode("", 200),
 		})
 		if err != nil {
 			t.Fatalf("RegisterRoute failed: %v", err)
@@ -176,7 +176,7 @@ func TestDynamicMockServer(t *testing.T) {
 	t.Run("ResetAll", func(t *testing.T) {
 		// Register a route again
 		client.RegisterRoute(mockPort, "GET", "/test2", []ResponseFuncConfig{
-			SetStatusCode(200),
+			SetStatusCode("", 200),
 		})
 		waitForServer(fmt.Sprintf("http://localhost:%d/test2", mockPort))
 

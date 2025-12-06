@@ -12,9 +12,9 @@ func runBasicExamples(client *dms.Client) {
 	// Example 1: Simple GET request
 	fmt.Println("1. Registering simple GET /hello")
 	err := client.RegisterRoute(MockPort, "GET", "/hello", []dms.ResponseFuncConfig{
-		dms.SetStatusCode(200),
-		dms.SetJsonBody(`{"message": "Hello World"}`),
-		dms.SetHeader("Content-Type", "application/json"),
+		dms.SetStatusCode("", 200),
+		dms.SetJsonBody("", `{"message": "Hello World"}`),
+		dms.SetHeader("", "Content-Type", "application/json"),
 	})
 	if err != nil {
 		fmt.Printf("Error registering route: %v\n", err)
@@ -27,8 +27,8 @@ func runBasicExamples(client *dms.Client) {
 	// Example 2: POST request with different status code
 	fmt.Println("2. Registering POST /created")
 	err = client.RegisterRoute(MockPort, "POST", "/created", []dms.ResponseFuncConfig{
-		dms.SetStatusCode(201),
-		dms.SetJsonBody(`{"id": 123, "status": "created"}`),
+		dms.SetStatusCode("", 201),
+		dms.SetJsonBody("", `{"id": 123, "status": "created"}`),
 	})
 	if err != nil {
 		fmt.Printf("Error registering route: %v\n", err)

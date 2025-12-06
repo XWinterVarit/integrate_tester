@@ -12,9 +12,9 @@ func runAdvancedExamples(client *dms.Client) {
 	// Example 1: Latency Simulation
 	fmt.Println("1. Latency: Random wait 500ms-1000ms")
 	err := client.RegisterRoute(MockPort, "GET", "/slow", []dms.ResponseFuncConfig{
-		dms.SetRandomWait(500, 1000),
-		dms.SetJsonBody(`{"status": "done"}`),
-		dms.SetStatusCode(200),
+		dms.SetRandomWait("", 500, 1000),
+		dms.SetJsonBody("", `{"status": "done"}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)
@@ -28,9 +28,9 @@ func runAdvancedExamples(client *dms.Client) {
 	// Example 2: Copying Headers (Trace ID)
 	fmt.Println("2. Copy Headers: X-Trace-ID")
 	err = client.RegisterRoute(MockPort, "GET", "/trace", []dms.ResponseFuncConfig{
-		dms.CopyHeaderFromRequest("X-Trace-ID"),
-		dms.SetJsonBody(`{"status": "traced"}`),
-		dms.SetStatusCode(200),
+		dms.CopyHeaderFromRequest("", "X-Trace-ID"),
+		dms.SetJsonBody("", `{"status": "traced"}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)

@@ -123,66 +123,75 @@ func TestClientHelpers(t *testing.T) {
 			},
 		},
 		{
+			name: "IfRequestHeaderSetCase",
+			got:  IfRequestHeaderSetCase("Auth", "Equal", "val", "CaseA"),
+			expected: ResponseFuncConfig{
+				Group: GroupPrepareData,
+				Func:  FuncIfRequestHeaderSetCase,
+				Args:  []interface{}{"Auth", "Equal", "val", "CaseA"},
+			},
+		},
+		{
 			name: "SetJsonBody",
-			got:  SetJsonBody(`{"a":1}`),
+			got:  SetJsonBody("C1", `{"a":1}`),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetJsonBody,
-				Args:  []interface{}{`{"a":1}`},
+				Args:  []interface{}{"C1", `{"a":1}`},
 			},
 		},
 		{
 			name: "SetStatusCode",
-			got:  SetStatusCode(201),
+			got:  SetStatusCode("", 201),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetStatusCode,
-				Args:  []interface{}{201},
+				Args:  []interface{}{"", 201},
 			},
 		},
 		{
 			name: "SetWait",
-			got:  SetWait(100),
+			got:  SetWait("", 100),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetWait,
-				Args:  []interface{}{100},
+				Args:  []interface{}{"", 100},
 			},
 		},
 		{
 			name: "SetRandomWait",
-			got:  SetRandomWait(10, 20),
+			got:  SetRandomWait("", 10, 20),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetRandomWait,
-				Args:  []interface{}{10, 20},
+				Args:  []interface{}{"", 10, 20},
 			},
 		},
 		{
 			name: "SetMethod",
-			got:  SetMethod("POST"),
+			got:  SetMethod("", "POST"),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetMethod,
-				Args:  []interface{}{"POST"},
+				Args:  []interface{}{"", "POST"},
 			},
 		},
 		{
 			name: "SetHeader",
-			got:  SetHeader("Content-Type", "application/json"),
+			got:  SetHeader("", "Content-Type", "application/json"),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncSetHeader,
-				Args:  []interface{}{"Content-Type", "application/json"},
+				Args:  []interface{}{"", "Content-Type", "application/json"},
 			},
 		},
 		{
 			name: "CopyHeaderFromRequest",
-			got:  CopyHeaderFromRequest("X-Trace-ID"),
+			got:  CopyHeaderFromRequest("", "X-Trace-ID"),
 			expected: ResponseFuncConfig{
 				Group: GroupSetupResponse,
 				Func:  FuncCopyHeaderFromRequest,
-				Args:  []interface{}{"X-Trace-ID"},
+				Args:  []interface{}{"", "X-Trace-ID"},
 			},
 		},
 	}

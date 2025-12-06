@@ -14,8 +14,8 @@ func runGeneratorExamples(client *dms.Client) {
 		dms.GenerateRandomInt(100, 999, "RAND_ID"),
 
 		// Note: "RAND_CODE" is string, so we quote it in JSON. "RAND_ID" is int, so we don't quote.
-		dms.SetJsonBody(`{"code": "{{.RAND_CODE}}", "id": {{.RAND_ID}}}`),
-		dms.SetStatusCode(200),
+		dms.SetJsonBody("", `{"code": "{{.RAND_CODE}}", "id": {{.RAND_ID}}}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)
@@ -35,8 +35,8 @@ func runGeneratorExamples(client *dms.Client) {
 		dms.GenerateRandomInt(1, 10, "NUM"),
 		dms.ConvertToString("NUM"),
 
-		dms.SetJsonBody(`{"salt": "{{.SALT}}", "hash": "{{.HASHED_SALT}}", "num_as_string": "{{.NUM}}"}`),
-		dms.SetStatusCode(200),
+		dms.SetJsonBody("", `{"salt": "{{.SALT}}", "hash": "{{.HASHED_SALT}}", "num_as_string": "{{.NUM}}"}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)

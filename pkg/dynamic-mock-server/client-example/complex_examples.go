@@ -29,9 +29,9 @@ func runComplexExamples(client *dms.Client) {
 		dms.GenerateRandomInt(100, 500, "PROC_TIME_MS"),
 
 		// 4. Setup Response
-		dms.SetStatusCode(200),
-		dms.SetHeader("X-Ref-Code", "{{.REF_CODE}}"),
-		dms.SetJsonBody(`{
+		dms.SetStatusCode("", 200),
+		dms.SetHeader("", "X-Ref-Code", "{{.REF_CODE}}"),
+		dms.SetJsonBody("", `{
 			"status": "success",
 			"transaction_id": "{{.TX_ID}}",
 			"confirmation_code": "{{.REF_CODE}}",

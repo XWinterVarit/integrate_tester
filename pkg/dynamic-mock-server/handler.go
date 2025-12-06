@@ -29,6 +29,7 @@ type HandlerExecutor struct {
 	Headers    map[string]string
 	FixedDelay time.Duration
 	RandomWait [2]int // min, max
+	ActiveCase string
 }
 
 func NewHandlerExecutor(w http.ResponseWriter, r *http.Request) *HandlerExecutor {
@@ -179,6 +180,64 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 
 		queryField := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.URL.Query().Get(queryField)
+
+	case FuncIfRequestHeaderSetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		headerName := fmt.Sprintf("%v", args[0])
+		actualVal = h.Request.Header.Get(headerName)
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestJsonBodySetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		actualVal = h.getJSONPath(fieldPath)
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestPathSetCase:
+		if len(args) < 3 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[0])
+		expectedVal = h.resolveArg(args[1])
+		caseStr := fmt.Sprintf("%v", args[2])
+		actualVal = h.Request.URL.Path
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestQuerySetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		queryField := fmt.Sprintf("%v", args[0])
+		actualVal = h.Request.URL.Query().Get(queryField)
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
 
 	case FuncExtractRequestHeader:
 		if len(args) < 2 {
@@ -350,26 +409,36 @@ func (h *HandlerExecutor) handleDynamicVariable(f ResponseFuncConfig) error {
 
 func (h *HandlerExecutor) handleSetupResponse(f ResponseFuncConfig) error {
 	args := f.Args
+	if len(args) == 0 {
+		return nil
+	}
+	caseStr := fmt.Sprintf("%v", args[0])
+	// If ActiveCase is "", it matches "" (default)
+	// If ActiveCase is "CaseA", it matches "CaseA"
+	if caseStr != h.ActiveCase {
+		return nil
+	}
+
 	switch f.Func {
 	case FuncSetJsonBody:
-		h.Body = fmt.Sprintf("%v", args[0])
+		h.Body = fmt.Sprintf("%v", args[1])
 	case FuncSetStatusCode:
-		h.StatusCode = int(toFloat(args[0]))
+		h.StatusCode = int(toFloat(args[1]))
 	case FuncSetWait:
-		h.FixedDelay = time.Duration(toFloat(args[0])) * time.Millisecond
+		h.FixedDelay = time.Duration(toFloat(args[1])) * time.Millisecond
 	case FuncSetRandomWait:
-		h.RandomWait[0] = int(toFloat(args[0]))
-		h.RandomWait[1] = int(toFloat(args[1]))
+		h.RandomWait[0] = int(toFloat(args[1]))
+		h.RandomWait[1] = int(toFloat(args[2]))
 	case FuncSetMethod:
 		// Usually response doesn't set method, maybe this is for asserting?
 		// Or maybe it's mimicking? The req says "SetMethod".
 		// Unclear usage for response, ignoring for now or logging.
 	case FuncSetHeader:
-		key := fmt.Sprintf("%v", args[0])
-		val := h.resolveString(fmt.Sprintf("%v", args[1]))
+		key := fmt.Sprintf("%v", args[1])
+		val := h.resolveString(fmt.Sprintf("%v", args[2]))
 		h.Headers[key] = val
 	case FuncCopyHeaderFromRequest:
-		key := fmt.Sprintf("%v", args[0])
+		key := fmt.Sprintf("%v", args[1])
 		val := h.Request.Header.Get(key)
 		if val != "" {
 			h.Headers[key] = val

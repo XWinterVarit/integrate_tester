@@ -115,6 +115,38 @@ func IfRequestQuery(field, condition, value, dynamicVar string, toBeValue interf
 	}
 }
 
+func IfRequestHeaderSetCase(headerName, condition, value, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestHeaderSetCase,
+		Args:  []interface{}{headerName, condition, value, caseStr},
+	}
+}
+
+func IfRequestJsonBodySetCase(field, condition string, value interface{}, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonBodySetCase,
+		Args:  []interface{}{field, condition, value, caseStr},
+	}
+}
+
+func IfRequestPathSetCase(condition, value, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestPathSetCase,
+		Args:  []interface{}{condition, value, caseStr},
+	}
+}
+
+func IfRequestQuerySetCase(field, condition, value, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestQuerySetCase,
+		Args:  []interface{}{field, condition, value, caseStr},
+	}
+}
+
 func ExtractRequestHeader(headerName, dynamicVar string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
@@ -211,58 +243,58 @@ func Delete(dynamicVariable string) ResponseFuncConfig {
 	}
 }
 
-func SetJsonBody(jsonBody string) ResponseFuncConfig {
+func SetJsonBody(caseStr, jsonBody string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetJsonBody,
-		Args:  []interface{}{jsonBody},
+		Args:  []interface{}{caseStr, jsonBody},
 	}
 }
 
-func SetStatusCode(statusCode int) ResponseFuncConfig {
+func SetStatusCode(caseStr string, statusCode int) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetStatusCode,
-		Args:  []interface{}{statusCode},
+		Args:  []interface{}{caseStr, statusCode},
 	}
 }
 
-func SetWait(timeoutMs int) ResponseFuncConfig {
+func SetWait(caseStr string, timeoutMs int) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetWait,
-		Args:  []interface{}{timeoutMs},
+		Args:  []interface{}{caseStr, timeoutMs},
 	}
 }
 
-func SetRandomWait(minMs, maxMs int) ResponseFuncConfig {
+func SetRandomWait(caseStr string, minMs, maxMs int) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetRandomWait,
-		Args:  []interface{}{minMs, maxMs},
+		Args:  []interface{}{caseStr, minMs, maxMs},
 	}
 }
 
-func SetMethod(method string) ResponseFuncConfig {
+func SetMethod(caseStr, method string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetMethod,
-		Args:  []interface{}{method},
+		Args:  []interface{}{caseStr, method},
 	}
 }
 
-func SetHeader(key, value string) ResponseFuncConfig {
+func SetHeader(caseStr, key, value string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncSetHeader,
-		Args:  []interface{}{key, value},
+		Args:  []interface{}{caseStr, key, value},
 	}
 }
 
-func CopyHeaderFromRequest(key string) ResponseFuncConfig {
+func CopyHeaderFromRequest(caseStr, key string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupSetupResponse,
 		Func:  FuncCopyHeaderFromRequest,
-		Args:  []interface{}{key},
+		Args:  []interface{}{caseStr, key},
 	}
 }

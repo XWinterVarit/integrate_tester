@@ -163,10 +163,10 @@ func TestHandlerExecutor_SetupResponse(t *testing.T) {
 	h.Variables["V"] = "World"
 
 	steps := []ResponseFuncConfig{
-		SetStatusCode(201),
-		SetHeader("X-Resp", "RespVal"),
-		CopyHeaderFromRequest("X-Req"),
-		SetJsonBody(`{"hello": "{{.V}}"}`),
+		SetStatusCode("", 201),
+		SetHeader("", "X-Resp", "RespVal"),
+		CopyHeaderFromRequest("", "X-Req"),
+		SetJsonBody("", `{"hello": "{{.V}}"}`),
 	}
 	h.Execute(steps)
 	h.Finalize()
@@ -186,6 +186,35 @@ func TestHandlerExecutor_SetupResponse(t *testing.T) {
 	buf.ReadFrom(resp.Body)
 	if !strings.Contains(buf.String(), `"hello": "World"`) {
 		t.Errorf("Body template not resolved: %s", buf.String())
+	}
+}
+
+func TestHandlerExecutor_SetCase(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("Type", "B")
+	w := httptest.NewRecorder()
+	h := NewHandlerExecutor(w, req)
+
+	steps := []ResponseFuncConfig{
+		// Default response (Case "")
+		SetStatusCode("", 200),
+		SetJsonBody("", "Default"),
+
+		// Switch Case
+		IfRequestHeaderSetCase("Type", "Equal", "B", "CaseB"),
+
+		// Case B response
+		SetStatusCode("CaseB", 201),
+		SetJsonBody("CaseB", "ResponseB"),
+	}
+	h.Execute(steps)
+	h.Finalize()
+
+	if h.StatusCode != 201 {
+		t.Errorf("Expected status 201, got %d", h.StatusCode)
+	}
+	if h.Body != "ResponseB" {
+		t.Errorf("Expected Body ResponseB, got %s", h.Body)
 	}
 }
 

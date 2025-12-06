@@ -19,8 +19,8 @@ func runConditionalExamples(client *dms.Client) {
 		dms.IfRequestPath(dms.ConditionEqual, "/auth-check", "USER_NAME", "Guest"),
 
 		dms.IfRequestHeader("Authorization", dms.ConditionEqual, "Bearer secret", "USER_NAME", "AdminUser"),
-		dms.SetJsonBody(`{"user": "{{.USER_NAME}}", "info": "If empty user, auth failed"}`),
-		dms.SetStatusCode(200),
+		dms.SetJsonBody("", `{"user": "{{.USER_NAME}}", "info": "If empty user, auth failed"}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)
@@ -42,8 +42,8 @@ func runConditionalExamples(client *dms.Client) {
 		dms.IfRequestPath(dms.ConditionEqual, "/upgrade", "MESSAGE", "Standard User"),
 
 		dms.IfRequestJsonBody("type", dms.ConditionEqual, "premium", "MESSAGE", "Welcome Premium User!"),
-		dms.SetJsonBody(`{"msg": "{{.MESSAGE}}"}`),
-		dms.SetStatusCode(200),
+		dms.SetJsonBody("", `{"msg": "{{.MESSAGE}}"}`),
+		dms.SetStatusCode("", 200),
 	})
 	if err != nil {
 		fmt.Printf("Error registering: %v\n", err)
