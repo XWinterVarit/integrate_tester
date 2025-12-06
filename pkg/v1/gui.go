@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -105,10 +106,21 @@ func RunGUI(t *Tester) {
 					btn.SetText("Run")
 					btn.OnTapped = func() {
 						go func() {
+							defer func() {
+								if r := recover(); r != nil {
+									errMsg := fmt.Sprintf("%v", r)
+									Log(LogTypeInfo, "Manual Run FAILED: "+action.Summary, errMsg)
+									fyne.Do(func() {
+										dialog.ShowError(fmt.Errorf("Execution Failed: %s", errMsg), myWindow)
+									})
+								}
+							}()
+
 							// Run individual action
 							// We don't update stage status for individual run
 							Log(LogTypeInfo, "Manual Run: "+action.Summary, "")
 							action.Func()
+							Log(LogTypeInfo, "Manual Run PASSED: "+action.Summary, "")
 						}()
 					}
 					btn.Show()
