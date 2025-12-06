@@ -147,6 +147,70 @@ func IfRequestQuerySetCase(field, condition, value, caseStr string) ResponseFunc
 	}
 }
 
+func IfDynamicVariable(varName, condition, value, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfDynamicVariable,
+		Args:  []interface{}{varName, condition, value, dynamicVar, toBeValue},
+	}
+}
+
+func IfDynamicVariableSetCase(varName, condition, value, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfDynamicVariableSetCase,
+		Args:  []interface{}{varName, condition, value, caseStr},
+	}
+}
+
+func IfRequestJsonArrayLength(field, condition string, length int, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonArrayLength,
+		Args:  []interface{}{field, condition, length, dynamicVar, toBeValue},
+	}
+}
+
+func IfRequestJsonArrayLengthSetCase(field, condition string, length int, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonArrayLengthSetCase,
+		Args:  []interface{}{field, condition, length, caseStr},
+	}
+}
+
+func IfRequestJsonObjectLength(field, condition string, length int, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonObjectLength,
+		Args:  []interface{}{field, condition, length, dynamicVar, toBeValue},
+	}
+}
+
+func IfRequestJsonObjectLengthSetCase(field, condition string, length int, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonObjectLengthSetCase,
+		Args:  []interface{}{field, condition, length, caseStr},
+	}
+}
+
+func IfRequestJsonType(field, typeStr, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonType,
+		Args:  []interface{}{field, typeStr, dynamicVar, toBeValue},
+	}
+}
+
+func IfRequestJsonTypeSetCase(field, typeStr, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestJsonTypeSetCase,
+		Args:  []interface{}{field, typeStr, caseStr},
+	}
+}
+
 func ExtractRequestHeader(headerName, dynamicVar string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
@@ -232,6 +296,26 @@ func ConvertToInt(dynamicVariable string) ResponseFuncConfig {
 		Group: GroupDynamicVariable,
 		Func:  FuncConvertToInt,
 		Args:  []interface{}{dynamicVariable},
+	}
+}
+
+func DynamicVarSubstring(sourceVar string, start, end int, targetVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupDynamicVariable,
+		Func:  FuncDynamicVarSubstring,
+		Args:  []interface{}{sourceVar, start, end, targetVar},
+	}
+}
+
+func DynamicVarJoin(targetVar, separator string, parts ...string) ResponseFuncConfig {
+	args := []interface{}{targetVar, separator}
+	for _, p := range parts {
+		args = append(args, p)
+	}
+	return ResponseFuncConfig{
+		Group: GroupDynamicVariable,
+		Func:  FuncDynamicVarJoin,
+		Args:  args,
 	}
 }
 

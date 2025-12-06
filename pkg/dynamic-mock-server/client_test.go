@@ -132,6 +132,51 @@ func TestClientHelpers(t *testing.T) {
 			},
 		},
 		{
+			name: "IfDynamicVariable",
+			got:  IfDynamicVariable("V1", "Equal", "val", "V2", "true"),
+			expected: ResponseFuncConfig{
+				Group: GroupPrepareData,
+				Func:  FuncIfDynamicVariable,
+				Args:  []interface{}{"V1", "Equal", "val", "V2", "true"},
+			},
+		},
+		{
+			name: "IfRequestJsonArrayLength",
+			got:  IfRequestJsonArrayLength("arr", "Equal", 5, "VAR", "true"),
+			expected: ResponseFuncConfig{
+				Group: GroupPrepareData,
+				Func:  FuncIfRequestJsonArrayLength,
+				Args:  []interface{}{"arr", "Equal", 5, "VAR", "true"},
+			},
+		},
+		{
+			name: "IfRequestJsonType",
+			got:  IfRequestJsonType("field", "string", "VAR", "true"),
+			expected: ResponseFuncConfig{
+				Group: GroupPrepareData,
+				Func:  FuncIfRequestJsonType,
+				Args:  []interface{}{"field", "string", "VAR", "true"},
+			},
+		},
+		{
+			name: "DynamicVarSubstring",
+			got:  DynamicVarSubstring("SRC", 0, 2, "DST"),
+			expected: ResponseFuncConfig{
+				Group: GroupDynamicVariable,
+				Func:  FuncDynamicVarSubstring,
+				Args:  []interface{}{"SRC", 0, 2, "DST"},
+			},
+		},
+		{
+			name: "DynamicVarJoin",
+			got:  DynamicVarJoin("DST", "-", "A", "B"),
+			expected: ResponseFuncConfig{
+				Group: GroupDynamicVariable,
+				Func:  FuncDynamicVarJoin,
+				Args:  []interface{}{"DST", "-", "A", "B"},
+			},
+		},
+		{
 			name: "SetJsonBody",
 			got:  SetJsonBody("C1", `{"a":1}`),
 			expected: ResponseFuncConfig{

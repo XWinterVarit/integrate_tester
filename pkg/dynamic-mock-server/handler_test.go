@@ -266,3 +266,76 @@ func TestHandlerExecutor_ExtractRequestData(t *testing.T) {
 		t.Errorf("QUERY_Q mismatch, got %v", h.Variables["QUERY_Q"])
 	}
 }
+
+func TestHandlerExecutor_NewFeatures(t *testing.T) {
+	t.Run("IfDynamicVariable", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/", nil)
+		h := NewHandlerExecutor(httptest.NewRecorder(), req)
+		h.Variables["EXISTING"] = "some_value"
+
+		steps := []ResponseFuncConfig{
+			IfDynamicVariable("EXISTING", "Equal", "some_value", "CHECK_OK", "yes"),
+			IfDynamicVariable("EXISTING", "Equal", "other", "CHECK_FAIL", "yes"),
+		}
+		h.Execute(steps)
+
+		if h.Variables["CHECK_OK"] != "yes" {
+			t.Error("CHECK_OK not set")
+		}
+		if _, ok := h.Variables["CHECK_FAIL"]; ok {
+			t.Error("CHECK_FAIL should not be set")
+		}
+	})
+
+	t.Run("JSON_Checks", func(t *testing.T) {
+		body := `{"list": [1, 2, 3], "obj": {"a": 1, "b": 2}, "str": "hello", "num": 123}`
+		req, _ := http.NewRequest("POST", "/", bytes.NewBufferString(body))
+		h := NewHandlerExecutor(httptest.NewRecorder(), req)
+
+		steps := []ResponseFuncConfig{
+			IfRequestJsonArrayLength("list", "Equal", 3, "LEN_ARR_OK", "yes"),
+			IfRequestJsonObjectLength("obj", "Equal", 2, "LEN_OBJ_OK", "yes"),
+			IfRequestJsonType("str", "string", "TYPE_STR_OK", "yes"),
+			IfRequestJsonType("num", "number", "TYPE_NUM_OK", "yes"),
+			IfRequestJsonType("list", "array", "TYPE_ARR_OK", "yes"),
+		}
+		h.Execute(steps)
+
+		if h.Variables["LEN_ARR_OK"] != "yes" {
+			t.Error("LEN_ARR_OK not set")
+		}
+		if h.Variables["LEN_OBJ_OK"] != "yes" {
+			t.Error("LEN_OBJ_OK not set")
+		}
+		if h.Variables["TYPE_STR_OK"] != "yes" {
+			t.Error("TYPE_STR_OK not set")
+		}
+		if h.Variables["TYPE_NUM_OK"] != "yes" {
+			t.Error("TYPE_NUM_OK not set")
+		}
+		if h.Variables["TYPE_ARR_OK"] != "yes" {
+			t.Error("TYPE_ARR_OK not set")
+		}
+	})
+
+	t.Run("DynamicVar_Manipulate", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/", nil)
+		h := NewHandlerExecutor(httptest.NewRecorder(), req)
+		h.Variables["SRC"] = "Hello World"
+		h.Variables["PART1"] = "A"
+		h.Variables["PART2"] = "B"
+
+		steps := []ResponseFuncConfig{
+			DynamicVarSubstring("SRC", 0, 5, "SUB"),                        // "Hello"
+			DynamicVarJoin("JOINED", "-", "{{.PART1}}", "{{.PART2}}", "C"), // "A-B-C"
+		}
+		h.Execute(steps)
+
+		if h.Variables["SUB"] != "Hello" {
+			t.Errorf("SUB mismatch, got '%v'", h.Variables["SUB"])
+		}
+		if h.Variables["JOINED"] != "A-B-C" {
+			t.Errorf("JOINED mismatch, got '%v'", h.Variables["JOINED"])
+		}
+	})
+}

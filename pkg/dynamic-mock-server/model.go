@@ -34,10 +34,21 @@ const (
 	FuncIfRequestPathSetCase     = "IfRequestPathSetCase"
 	FuncIfRequestQuery           = "IfRequestQuery"
 	FuncIfRequestQuerySetCase    = "IfRequestQuerySetCase"
-	FuncExtractRequestHeader     = "ExtractRequestHeader"
-	FuncExtractRequestJsonBody   = "ExtractRequestJsonBody"
-	FuncExtractRequestPath       = "ExtractRequestPath"
-	FuncExtractRequestQuery      = "ExtractRequestQuery"
+	FuncIfDynamicVariable        = "IfDynamicVariable"
+	FuncIfDynamicVariableSetCase = "IfDynamicVariableSetCase"
+
+	// JSON checks
+	FuncIfRequestJsonArrayLength         = "IfRequestJsonArrayLength"
+	FuncIfRequestJsonArrayLengthSetCase  = "IfRequestJsonArrayLengthSetCase"
+	FuncIfRequestJsonObjectLength        = "IfRequestJsonObjectLength"
+	FuncIfRequestJsonObjectLengthSetCase = "IfRequestJsonObjectLengthSetCase"
+	FuncIfRequestJsonType                = "IfRequestJsonType"
+	FuncIfRequestJsonTypeSetCase         = "IfRequestJsonTypeSetCase"
+
+	FuncExtractRequestHeader   = "ExtractRequestHeader"
+	FuncExtractRequestJsonBody = "ExtractRequestJsonBody"
+	FuncExtractRequestPath     = "ExtractRequestPath"
+	FuncExtractRequestQuery    = "ExtractRequestQuery"
 
 	// Generator
 	FuncGenerateRandomString       = "GenerateRandomString"
@@ -47,9 +58,11 @@ const (
 	FuncHashedString               = "HashedString"
 
 	// DynamicVariable
-	FuncConvertToString = "ConvertToString"
-	FuncConvertToInt    = "ConvertToInt"
-	FuncDelete          = "Delete"
+	FuncConvertToString     = "ConvertToString"
+	FuncConvertToInt        = "ConvertToInt"
+	FuncDynamicVarSubstring = "DynamicVarSubstring"
+	FuncDynamicVarJoin      = "DynamicVarJoin"
+	FuncDelete              = "Delete"
 
 	// SetupResponse
 	FuncSetJsonBody           = "SetJsonBody"

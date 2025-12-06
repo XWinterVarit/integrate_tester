@@ -181,6 +181,71 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 		queryField := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.URL.Query().Get(queryField)
 
+	case FuncIfDynamicVariable:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
+		varName := fmt.Sprintf("%v", args[0])
+		if val, ok := h.Variables[varName]; ok {
+			actualVal = val
+		} else {
+			actualVal = nil
+		}
+
+	case FuncIfRequestJsonArrayLength:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		if arr, ok := val.([]interface{}); ok {
+			actualVal = len(arr)
+		} else {
+			actualVal = -1
+		}
+
+	case FuncIfRequestJsonObjectLength:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		if m, ok := val.(map[string]interface{}); ok {
+			actualVal = len(m)
+		} else {
+			actualVal = -1
+		}
+
+	case FuncIfRequestJsonType:
+		if len(args) < 4 {
+			return nil
+		}
+		// Field, TypeStr, TargetVar, ToBeValue
+		// Implicit condition "Equal" for type check
+		condition = ConditionEqual
+		expectedVal = fmt.Sprintf("%v", args[1])
+		targetVar = fmt.Sprintf("%v", args[2])
+		toBeVal = h.resolveArg(args[3])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		actualVal = getTypeOf(val)
+
 	case FuncIfRequestHeaderSetCase:
 		if len(args) < 4 {
 			return nil
@@ -234,6 +299,83 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 
 		queryField := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.URL.Query().Get(queryField)
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfDynamicVariableSetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		varName := fmt.Sprintf("%v", args[0])
+		if val, ok := h.Variables[varName]; ok {
+			actualVal = val
+		} else {
+			actualVal = nil
+		}
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestJsonArrayLengthSetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		if arr, ok := val.([]interface{}); ok {
+			actualVal = len(arr)
+		} else {
+			actualVal = -1
+		}
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestJsonObjectLengthSetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		if m, ok := val.(map[string]interface{}); ok {
+			actualVal = len(m)
+		} else {
+			actualVal = -1
+		}
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestJsonTypeSetCase:
+		if len(args) < 3 {
+			return nil
+		}
+		// Field, TypeStr, CaseStr
+		condition = ConditionEqual
+		expectedVal = fmt.Sprintf("%v", args[1])
+		caseStr := fmt.Sprintf("%v", args[2])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		val := h.getJSONPath(fieldPath)
+		actualVal = getTypeOf(val)
+
 		if h.checkCondition(actualVal, condition, expectedVal) {
 			h.ActiveCase = caseStr
 		}
@@ -401,6 +543,38 @@ func (h *HandlerExecutor) handleDynamicVariable(f ResponseFuncConfig) error {
 		if v, ok := h.Variables[targetVar]; ok {
 			h.Variables[targetVar] = int(toFloat(v))
 		}
+	case FuncDynamicVarSubstring:
+		// Args: sourceVar, start, end, targetVar
+		sourceVar := fmt.Sprintf("%v", args[0])
+		start := int(toFloat(args[1]))
+		end := int(toFloat(args[2]))
+		dstVar := fmt.Sprintf("%v", args[3])
+
+		if v, ok := h.Variables[sourceVar]; ok {
+			strVal := fmt.Sprintf("%v", v)
+			if start < 0 {
+				start = 0
+			}
+			if end > len(strVal) {
+				end = len(strVal)
+			}
+			if start <= end {
+				h.Variables[dstVar] = strVal[start:end]
+			} else {
+				h.Variables[dstVar] = ""
+			}
+		}
+	case FuncDynamicVarJoin:
+		// Args: targetVar, separator, part1, part2...
+		dstVar := fmt.Sprintf("%v", args[0])
+		sep := fmt.Sprintf("%v", args[1])
+		var parts []string
+		for i := 2; i < len(args); i++ {
+			// Resolve each part as a potential template or value
+			val := h.resolveArg(args[i])
+			parts = append(parts, fmt.Sprintf("%v", val))
+		}
+		h.Variables[dstVar] = strings.Join(parts, sep)
 	case FuncDelete:
 		delete(h.Variables, targetVar)
 	}
@@ -477,4 +651,23 @@ func randomString(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func getTypeOf(v interface{}) string {
+	if v == nil {
+		return "null"
+	}
+	switch v.(type) {
+	case string:
+		return "string"
+	case float64, int, int64:
+		return "number"
+	case bool:
+		return "boolean"
+	case []interface{}:
+		return "array"
+	case map[string]interface{}:
+		return "object"
+	}
+	return "unknown"
 }

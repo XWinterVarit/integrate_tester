@@ -44,6 +44,12 @@ func main() {
 	fmt.Println("\n--- Running Complex Examples ---")
 	runComplexExamples(client)
 
+	fmt.Println("\n--- Running Case Examples ---")
+	runCaseExamples(client)
+
+	fmt.Println("\n--- Running New Features Examples ---")
+	runNewFeaturesExamples(client)
+
 	fmt.Println("\nAll examples executed successfully.")
 }
 
