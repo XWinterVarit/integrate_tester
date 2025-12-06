@@ -19,6 +19,7 @@ type MockServer struct {
 // RunMockServer starts a mock server on the specified port with given handlers.
 // port can be ":8080" or just "8080".
 func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer {
+	RecordAction(fmt.Sprintf("Mock Run: %s", port), func() { RunMockServer(port, handlers) })
 	if len(port) > 0 && port[0] != ':' {
 		port = ":" + port
 	}
@@ -49,6 +50,7 @@ func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer
 // It merges or replaces? The requirement says "UpdateMockServer".
 // Usually replacing the map is safer/cleaner for a "stage" change.
 func UpdateMockServer(ms *MockServer, handlers map[string]MockHandlerFunc) {
+	RecordAction("Mock Update", func() { UpdateMockServer(ms, handlers) })
 	Log(LogTypeMock, "Updating server handlers", "")
 	ms.mu.Lock()
 	defer ms.mu.Unlock()

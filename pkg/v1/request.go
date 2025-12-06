@@ -11,6 +11,7 @@ import (
 // SendRequest sends a HTTP GET request to the specified URL.
 // We use a different name than "Request" because "Request" is already a type.
 func SendRequest(url string) Response {
+	RecordAction(fmt.Sprintf("Request: %s", url), func() { SendRequest(url) })
 	Logf(LogTypeRequest, "Sending GET request to: %s", url)
 	resp, err := http.Get(url)
 	if err != nil {

@@ -13,6 +13,7 @@ type AppServer struct {
 
 // RunAppServer runs the application server.
 func RunAppServer(path string, args ...string) *AppServer {
+	RecordAction(fmt.Sprintf("App Run: %s", path), func() { RunAppServer(path, args...) })
 	cmd := exec.Command(path, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
