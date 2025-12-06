@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -161,7 +162,7 @@ func RunGUI(t *Tester) {
 	)
 
 	// --- Right Pane: Log Tree ---
-	// Structure: Root -> Stage Logs -> Operation Logs -> Details
+	// Structure: Root -> Stage Logs -> Operation Logs (Click for Popup)
 	var rightTree *widget.Tree
 	rightTree = widget.NewTree(
 		func(uid widget.TreeNodeID) []widget.TreeNodeID {
@@ -169,7 +170,7 @@ func RunGUI(t *Tester) {
 			defer logsMu.Unlock()
 
 			if uid == "" {
-				// Find all Stage Logs
+				// Find all Stage Logs (Roots)
 				var ids []string
 				for i, l := range logs {
 					if l.Type == LogTypeStage && strings.HasPrefix(l.Summary, "Running Stage:") {
@@ -180,10 +181,6 @@ func RunGUI(t *Tester) {
 			}
 
 			// If uid is a number, it's a log index
-			if strings.HasSuffix(uid, ":detail") {
-				return nil
-			}
-
 			idx, err := strconv.Atoi(uid)
 			if err != nil {
 				return nil
@@ -201,11 +198,7 @@ func RunGUI(t *Tester) {
 				for i := idx + 1; i < len(logs); i++ {
 					l := logs[i]
 					if l.Type == LogTypeStage {
-						// Stop at next stage event (Start, Passed, Failed)
-						// Actually, "PASSED/FAILED" are also Stage logs.
-						// We should group them under the "Running" log?
-						// Or just list them?
-						// Let's stop at next "Running Stage" or end.
+						// Stop at next "Running Stage"
 						if strings.HasPrefix(l.Summary, "Running Stage:") {
 							break
 						}
@@ -215,20 +208,10 @@ func RunGUI(t *Tester) {
 				return children
 			}
 
-			// Level 2: Operation -> Detail
-			if parentLog.Detail != "" {
-				// Use a suffix for detail node
-				return []string{fmt.Sprintf("%d:detail", idx)}
-			}
-
 			return nil
 		},
 		func(uid widget.TreeNodeID) bool {
-			// Check if branch
-			if strings.HasSuffix(uid, ":detail") {
-				return false
-			}
-
+			// Check if branch (Only Stage Headers are branches)
 			logsMu.Lock()
 			defer logsMu.Unlock()
 
@@ -246,10 +229,6 @@ func RunGUI(t *Tester) {
 			if l.Type == LogTypeStage && strings.HasPrefix(l.Summary, "Running Stage:") {
 				return true
 			}
-			// Logs with details are branches
-			if l.Detail != "" {
-				return true
-			}
 
 			return false
 		},
@@ -258,19 +237,6 @@ func RunGUI(t *Tester) {
 		},
 		func(uid widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			label := o.(*widget.Label)
-
-			if strings.HasSuffix(uid, ":detail") {
-				// Detail View
-				idxStr := strings.TrimSuffix(uid, ":detail")
-				idx, _ := strconv.Atoi(idxStr)
-				logsMu.Lock()
-				detail := logs[idx].Detail
-				logsMu.Unlock()
-				label.SetText(detail)
-				label.TextStyle = fyne.TextStyle{Monospace: true}
-				label.Wrapping = fyne.TextWrapWord
-				return
-			}
 
 			idx, _ := strconv.Atoi(uid)
 			logsMu.Lock()
@@ -283,9 +249,11 @@ func RunGUI(t *Tester) {
 
 			// Icons
 			icon := "🔹"
+			isStage := false
 			switch entry.Type {
 			case LogTypeStage:
 				icon = "📂"
+				isStage = true
 			case LogTypeDB:
 				icon = "🛢️"
 			case LogTypeRequest:
@@ -300,15 +268,73 @@ func RunGUI(t *Tester) {
 				icon = "ℹ️"
 			}
 
-			label.SetText(fmt.Sprintf("%s %s", icon, entry.Summary))
-			if entry.Type == LogTypeStage {
+			text := fmt.Sprintf("%s %s", icon, entry.Summary)
+			if !isStage {
+				text = "   " + text
+			}
+			label.SetText(text)
+
+			if isStage {
 				label.TextStyle = fyne.TextStyle{Bold: true}
 			} else {
 				label.TextStyle = fyne.TextStyle{}
 			}
-			label.Wrapping = fyne.TextWrapOff
+			label.Wrapping = fyne.TextWrapBreak
 		},
 	)
+
+	var lastClickID string
+	var lastClickTime time.Time
+
+	rightTree.OnSelected = func(uid widget.TreeNodeID) {
+		// Double Click Logic
+		now := time.Now()
+		if uid != lastClickID || now.Sub(lastClickTime) > 500*time.Millisecond {
+			lastClickID = uid
+			lastClickTime = now
+			rightTree.Unselect(uid)
+			return
+		}
+		lastClickID = "" // Reset
+
+		idx, err := strconv.Atoi(uid)
+		if err != nil {
+			rightTree.Unselect(uid)
+			return
+		}
+
+		logsMu.Lock()
+		if idx >= len(logs) {
+			logsMu.Unlock()
+			rightTree.Unselect(uid)
+			return
+		}
+		entry := logs[idx]
+		logsMu.Unlock()
+
+		// Create independent window (non-modal)
+		detailWin := myApp.NewWindow(entry.Summary)
+
+		content := widget.NewMultiLineEntry()
+		detailText := entry.Detail
+		if detailText == "" {
+			detailText = "(No details available)"
+		}
+
+		fullText := fmt.Sprintf("Summary: %s\n\n%s", entry.Summary, detailText)
+		content.SetText(fullText)
+		content.Wrapping = fyne.TextWrapWord
+		// Enabled to fix grey text issue
+
+		// Scrollable container
+		scroll := container.NewScroll(content)
+
+		detailWin.SetContent(scroll)
+		detailWin.Resize(fyne.NewSize(600, 400))
+		detailWin.Show()
+
+		rightTree.Unselect(uid)
+	}
 
 	// --- Handlers ---
 
