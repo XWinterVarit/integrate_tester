@@ -103,17 +103,17 @@ func RunGUI(t *Tester) {
 			icon := "🔹"
 			switch entry.Type {
 			case LogTypeStage:
-				icon = "🎬"
+				icon = "📂"
 			case LogTypeDB:
-				icon = "🗄️"
+				icon = "🛢️"
 			case LogTypeRequest:
-				icon = "🌐"
+				icon = "🌍"
 			case LogTypeMock:
-				icon = "🎭"
+				icon = "🤖"
 			case LogTypeApp:
-				icon = "🚀"
+				icon = "⚙️"
 			case LogTypeExpect:
-				icon = "✅"
+				icon = "🎯"
 			case LogTypeInfo:
 				icon = "ℹ️"
 			}
