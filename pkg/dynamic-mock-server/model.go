@@ -76,7 +76,14 @@ const (
 
 // Conditions
 const (
-	ConditionEqual = "Equal"
-	// Add other conditions as needed (e.g., NotEqual, Contains, etc.) based on requirement interpretation
-	// The requirement only shows "Equal" in examples, but standard comparison usually implies more.
+	ConditionEqual              = "Equal"
+	ConditionNotEqual           = "NotEqual"
+	ConditionContains           = "Contains"
+	ConditionNotContains        = "NotContains"
+	ConditionStartsWith         = "StartsWith"
+	ConditionEndsWith           = "EndsWith"
+	ConditionGreaterThan        = "GreaterThan"
+	ConditionLessThan           = "LessThan"
+	ConditionGreaterThanOrEqual = "GreaterThanOrEqual"
+	ConditionLessThanOrEqual    = "LessThanOrEqual"
 )

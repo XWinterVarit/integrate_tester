@@ -2,11 +2,77 @@ package dynamic_mock_server
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestHandlerExecutor_ExtendedConditions(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	h := NewHandlerExecutor(httptest.NewRecorder(), req)
+
+	// Setup Variables
+	h.Variables["STR_VAL"] = "Hello World"
+	h.Variables["NUM_VAL"] = 100
+	h.Variables["NUM_STR"] = "200"
+	h.Variables["BAD_NUM"] = "abc"
+
+	tests := []struct {
+		name      string
+		condition string
+		expected  interface{}
+		target    string
+		toBe      interface{}
+		varName   string
+		shouldSet bool
+	}{
+		// String Comparisons
+		{"NotEqual_True", ConditionNotEqual, "Goodbye", "RES_NE", "yes", "STR_VAL", true},
+		{"NotEqual_False", ConditionNotEqual, "Hello World", "RES_NE_F", "yes", "STR_VAL", false},
+		{"Contains_True", ConditionContains, "World", "RES_C", "yes", "STR_VAL", true},
+		{"Contains_False", ConditionContains, "Universe", "RES_C_F", "yes", "STR_VAL", false},
+		{"NotContains_True", ConditionNotContains, "Universe", "RES_NC", "yes", "STR_VAL", true},
+		{"StartsWith_True", ConditionStartsWith, "Hello", "RES_SW", "yes", "STR_VAL", true},
+		{"EndsWith_True", ConditionEndsWith, "World", "RES_EW", "yes", "STR_VAL", true},
+
+		// Numeric Comparisons (Int Variable)
+		{"GT_True", ConditionGreaterThan, 50, "RES_GT", "yes", "NUM_VAL", true},
+		{"GT_False", ConditionGreaterThan, 150, "RES_GT_F", "yes", "NUM_VAL", false},
+		{"LT_True", ConditionLessThan, 150, "RES_LT", "yes", "NUM_VAL", true},
+		{"GTE_True", ConditionGreaterThanOrEqual, 100, "RES_GTE", "yes", "NUM_VAL", true},
+		{"LTE_True", ConditionLessThanOrEqual, 100, "RES_LTE", "yes", "NUM_VAL", true},
+
+		// Numeric Comparisons (String Variable "200")
+		{"GT_Str_True", ConditionGreaterThan, 150, "RES_GT_S", "yes", "NUM_STR", true},
+
+		// Type Mismatch / Invalid Number
+		{"GT_Invalid_True", ConditionGreaterThan, 50, "RES_INV", "yes", "BAD_NUM", false},     // "abc" > 50 -> false
+		{"GT_Invalid_Exp", ConditionGreaterThan, "xyz", "RES_INV_2", "yes", "NUM_VAL", false}, // 100 > "xyz" -> false
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Using IfDynamicVariable for easier testing of logic
+			steps := []ResponseFuncConfig{
+				IfDynamicVariable(tt.varName, tt.condition, fmt.Sprintf("%v", tt.expected), tt.target, tt.toBe),
+			}
+			h.Execute(steps)
+
+			val, set := h.Variables[tt.target]
+			if tt.shouldSet {
+				if !set || val != tt.toBe {
+					t.Errorf("Expected variable %s to be set to %v, got %v (set=%v)", tt.target, tt.toBe, val, set)
+				}
+			} else {
+				if set {
+					t.Errorf("Expected variable %s NOT to be set, but it was set to %v", tt.target, val)
+				}
+			}
+		})
+	}
+}
 
 func TestHandlerExecutor_PrepareData(t *testing.T) {
 	t.Run("IfRequestHeader", func(t *testing.T) {

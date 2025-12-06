@@ -50,6 +50,9 @@ func main() {
 	fmt.Println("\n--- Running New Features Examples ---")
 	runNewFeaturesExamples(client)
 
+	fmt.Println("\n--- Running Extended Conditions Examples ---")
+	runExtendedConditionsExamples(client)
+
 	fmt.Println("\nAll examples executed successfully.")
 }
 

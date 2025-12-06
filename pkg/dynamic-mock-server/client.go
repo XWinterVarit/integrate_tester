@@ -147,7 +147,7 @@ func IfRequestQuerySetCase(field, condition, value, caseStr string) ResponseFunc
 	}
 }
 
-func IfDynamicVariable(varName, condition, value, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+func IfDynamicVariable(varName, condition string, value interface{}, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
 		Func:  FuncIfDynamicVariable,
@@ -155,7 +155,7 @@ func IfDynamicVariable(varName, condition, value, dynamicVar string, toBeValue i
 	}
 }
 
-func IfDynamicVariableSetCase(varName, condition, value, caseStr string) ResponseFuncConfig {
+func IfDynamicVariableSetCase(varName, condition string, value interface{}, caseStr string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
 		Func:  FuncIfDynamicVariableSetCase,
