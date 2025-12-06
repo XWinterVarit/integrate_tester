@@ -179,6 +179,44 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 
 		queryField := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.URL.Query().Get(queryField)
+
+	case FuncExtractRequestHeader:
+		if len(args) < 2 {
+			return nil
+		}
+		headerName := fmt.Sprintf("%v", args[0])
+		targetVar := fmt.Sprintf("%v", args[1])
+		h.Variables[targetVar] = h.Request.Header.Get(headerName)
+		return nil
+
+	case FuncExtractRequestJsonBody:
+		if len(args) < 2 {
+			return nil
+		}
+		fieldPath := fmt.Sprintf("%v", args[0])
+		targetVar := fmt.Sprintf("%v", args[1])
+		val := h.getJSONPath(fieldPath)
+		if val != nil {
+			h.Variables[targetVar] = val
+		}
+		return nil
+
+	case FuncExtractRequestPath:
+		if len(args) < 1 {
+			return nil
+		}
+		targetVar := fmt.Sprintf("%v", args[0])
+		h.Variables[targetVar] = h.Request.URL.Path
+		return nil
+
+	case FuncExtractRequestQuery:
+		if len(args) < 2 {
+			return nil
+		}
+		queryField := fmt.Sprintf("%v", args[0])
+		targetVar := fmt.Sprintf("%v", args[1])
+		h.Variables[targetVar] = h.Request.URL.Query().Get(queryField)
+		return nil
 	}
 
 	if h.checkCondition(actualVal, condition, expectedVal) {

@@ -115,6 +115,38 @@ func IfRequestQuery(field, condition, value, dynamicVar string, toBeValue interf
 	}
 }
 
+func ExtractRequestHeader(headerName, dynamicVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncExtractRequestHeader,
+		Args:  []interface{}{headerName, dynamicVar},
+	}
+}
+
+func ExtractRequestJsonBody(field, dynamicVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncExtractRequestJsonBody,
+		Args:  []interface{}{field, dynamicVar},
+	}
+}
+
+func ExtractRequestPath(dynamicVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncExtractRequestPath,
+		Args:  []interface{}{dynamicVar},
+	}
+}
+
+func ExtractRequestQuery(field, dynamicVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncExtractRequestQuery,
+		Args:  []interface{}{field, dynamicVar},
+	}
+}
+
 func GenerateRandomString(length int, toDynamicVariable string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupGenerator,

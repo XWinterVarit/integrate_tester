@@ -201,3 +201,39 @@ func TestResolveString(t *testing.T) {
 		t.Errorf("Expected Val-AAA, got %s", res)
 	}
 }
+
+func TestHandlerExecutor_ExtractRequestData(t *testing.T) {
+	body := `{"user": {"id": 99, "name": "Alice"}, "items": [{"price": 10.5}, {"price": 20.0}]}`
+	req, _ := http.NewRequest("GET", "/api/data?q=search", bytes.NewBufferString(body))
+	req.Header.Set("X-Token", "secret-token")
+	w := httptest.NewRecorder()
+	h := NewHandlerExecutor(w, req)
+
+	steps := []ResponseFuncConfig{
+		ExtractRequestHeader("X-Token", "TOKEN"),
+		ExtractRequestJsonBody("user.name", "USER_NAME"),
+		ExtractRequestJsonBody("items[0].price", "ITEM_PRICE"),
+		ExtractRequestPath("REQ_PATH"),
+		ExtractRequestQuery("q", "QUERY_Q"),
+	}
+
+	if err := h.Execute(steps); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if h.Variables["TOKEN"] != "secret-token" {
+		t.Errorf("TOKEN mismatch, got %v", h.Variables["TOKEN"])
+	}
+	if h.Variables["USER_NAME"] != "Alice" {
+		t.Errorf("USER_NAME mismatch, got %v", h.Variables["USER_NAME"])
+	}
+	if h.Variables["ITEM_PRICE"] != 10.5 {
+		t.Errorf("ITEM_PRICE mismatch, got %v", h.Variables["ITEM_PRICE"])
+	}
+	if h.Variables["REQ_PATH"] != "/api/data" {
+		t.Errorf("REQ_PATH mismatch, got %v", h.Variables["REQ_PATH"])
+	}
+	if h.Variables["QUERY_Q"] != "search" {
+		t.Errorf("QUERY_Q mismatch, got %v", h.Variables["QUERY_Q"])
+	}
+}

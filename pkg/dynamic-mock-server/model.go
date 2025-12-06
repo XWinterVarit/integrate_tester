@@ -26,10 +26,14 @@ const (
 // Constants for Response Func Names
 const (
 	// PrepareData
-	FuncIfRequestHeader   = "IfRequestHeader"
-	FuncIfRequestJsonBody = "IfRequestJsonBody"
-	FuncIfRequestPath     = "IfRequestPath"
-	FuncIfRequestQuery    = "IfRequestQuery"
+	FuncIfRequestHeader        = "IfRequestHeader"
+	FuncIfRequestJsonBody      = "IfRequestJsonBody"
+	FuncIfRequestPath          = "IfRequestPath"
+	FuncIfRequestQuery         = "IfRequestQuery"
+	FuncExtractRequestHeader   = "ExtractRequestHeader"
+	FuncExtractRequestJsonBody = "ExtractRequestJsonBody"
+	FuncExtractRequestPath     = "ExtractRequestPath"
+	FuncExtractRequestQuery    = "ExtractRequestQuery"
 
 	// Generator
 	FuncGenerateRandomString       = "GenerateRandomString"

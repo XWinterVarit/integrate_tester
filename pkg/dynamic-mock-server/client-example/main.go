@@ -41,6 +41,9 @@ func main() {
 	fmt.Println("\n--- Running Advanced Examples ---")
 	runAdvancedExamples(client)
 
+	fmt.Println("\n--- Running Complex Examples ---")
+	runComplexExamples(client)
+
 	fmt.Println("\nAll examples executed successfully.")
 }
 
