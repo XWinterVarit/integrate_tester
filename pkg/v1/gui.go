@@ -17,10 +17,9 @@ func RunGUI(t *Tester) {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("Integration Tests")
 
+	// 1. Stage List (Left Pane)
 	var stageControls []fyne.CanvasObject
-
-	// Header
-	stageControls = append(stageControls, widget.NewLabelWithStyle("Integration Test Stages", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}))
+	stageControls = append(stageControls, widget.NewLabelWithStyle("Stages", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}))
 
 	for _, stage := range t.Stages {
 		stageName := stage.Name // Capture variable
@@ -54,14 +53,84 @@ func RunGUI(t *Tester) {
 		stageControls = append(stageControls, row)
 	}
 
-	// Create a vertical box with all stage rows
-	content := container.NewVBox(stageControls...)
+	stageScroll := container.NewScroll(container.NewVBox(stageControls...))
 
-	// Wrap in a scroll container in case there are many stages
-	scroll := container.NewScroll(content)
+	// 2. Log Pane (Right Pane)
+	logsData := binding.NewUntypedList()
+	detailData := binding.NewString()
+	_ = detailData.Set("Select a log to view details...")
 
-	myWindow.SetContent(scroll)
-	myWindow.Resize(fyne.NewSize(600, 400))
+	// Detail View (Bottom)
+	detailLabel := widget.NewLabelWithData(detailData)
+	detailLabel.Wrapping = fyne.TextWrapWord
+	detailScroll := container.NewScroll(detailLabel)
+
+	// Log List (Top)
+	logList := widget.NewListWithData(
+		logsData,
+		func() fyne.CanvasObject {
+			return widget.NewLabel("Log Template")
+		},
+		func(i binding.DataItem, o fyne.CanvasObject) {
+			val, err := i.(binding.Untyped).Get()
+			if err != nil {
+				return
+			}
+			entry := val.(LogEntry)
+
+			icon := "🔹"
+			switch entry.Type {
+			case LogTypeStage:
+				icon = "🎬"
+			case LogTypeDB:
+				icon = "🗄️"
+			case LogTypeRequest:
+				icon = "🌐"
+			case LogTypeMock:
+				icon = "🎭"
+			case LogTypeApp:
+				icon = "🚀"
+			case LogTypeExpect:
+				icon = "✅"
+			case LogTypeInfo:
+				icon = "ℹ️"
+			}
+
+			label := o.(*widget.Label)
+			label.SetText(fmt.Sprintf("%s [%s] %s", icon, entry.Type, entry.Summary))
+
+			if entry.Type == LogTypeStage {
+				label.TextStyle = fyne.TextStyle{Bold: true}
+			} else {
+				label.TextStyle = fyne.TextStyle{}
+			}
+		},
+	)
+
+	logList.OnSelected = func(id widget.ListItemID) {
+		val, err := logsData.GetValue(id)
+		if err != nil {
+			return
+		}
+		entry := val.(LogEntry)
+		_ = detailData.Set(fmt.Sprintf("Type: %s\nSummary: %s\n\n%s", entry.Type, entry.Summary, entry.Detail))
+	}
+
+	// Subscribe to logs
+	RegisterLogHandler(func(entry LogEntry) {
+		_ = logsData.Append(entry)
+	})
+
+	// Right Pane Split (List vs Detail)
+	rightSplit := container.NewVSplit(logList, detailScroll)
+	rightSplit.SetOffset(0.7) // 70% List, 30% Detail
+
+	// Main Split Container
+	split := container.NewHSplit(stageScroll, rightSplit)
+	split.SetOffset(0.3) // 30% for stages
+
+	myWindow.SetContent(split)
+	myWindow.Resize(fyne.NewSize(900, 600))
 
 	log.Println("Starting GUI window...")
 	myWindow.ShowAndRun()

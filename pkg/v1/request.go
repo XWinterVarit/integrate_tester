@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"reflect"
 )
@@ -12,7 +11,7 @@ import (
 // SendRequest sends a HTTP GET request to the specified URL.
 // We use a different name than "Request" because "Request" is already a type.
 func SendRequest(url string) Response {
-	log.Printf("[Request] Sending GET request to: %s", url)
+	Logf(LogTypeRequest, "Sending GET request to: %s", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		// In integration tests, we often panic on setup failure, but here it's part of the test.
@@ -33,7 +32,7 @@ func SendRequest(url string) Response {
 		}
 	}
 
-	log.Printf("[Request] Received status %d from %s", resp.StatusCode, url)
+	Log(LogTypeRequest, fmt.Sprintf("Received status %d from %s", resp.StatusCode, url), fmt.Sprintf("Body: %s\nHeaders: %v", string(body), header))
 	return Response{
 		StatusCode: resp.StatusCode,
 		Body:       string(body),
@@ -46,7 +45,7 @@ func ExpectHeader(resp Response, key, value string) {
 	if got, ok := resp.Header[key]; !ok || got != value {
 		panic(fmt.Sprintf("ExpectHeader failed: expected %s=%s, got %s", key, value, got))
 	}
-	log.Printf("[Expect] Header '%s' == '%s' - PASSED", key, value)
+	Logf(LogTypeExpect, "Header '%s' == '%s' - PASSED", key, value)
 }
 
 // ExpectJsonBody asserts that the response body matches the expected JSON.
@@ -70,5 +69,5 @@ func ExpectJsonBody(resp Response, expectedJson interface{}) {
 	if !reflect.DeepEqual(got, expected) {
 		panic(fmt.Sprintf("ExpectJsonBody failed:\nExpected: %v\nGot:      %v", expected, got))
 	}
-	log.Printf("[Expect] JSON body matches expected value - PASSED")
+	Log(LogTypeExpect, "JSON body matches expected value - PASSED", "")
 }

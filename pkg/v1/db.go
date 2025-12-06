@@ -3,7 +3,6 @@ package v1
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 )
 
@@ -26,7 +25,7 @@ type DBClient struct {
 // Connect connects to the database.
 // Driver should be imported in the main application.
 func Connect(driverName, dataSourceName string) *DBClient {
-	log.Printf("[DB] Connecting to %s", driverName)
+	Logf(LogTypeDB, "Connecting to %s", driverName)
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to connect to DB: %v", err))
@@ -34,13 +33,13 @@ func Connect(driverName, dataSourceName string) *DBClient {
 	if err := db.Ping(); err != nil {
 		panic(fmt.Sprintf("Failed to ping DB: %v", err))
 	}
-	log.Printf("[DB] Connected successfully")
+	Log(LogTypeDB, "Connected successfully", "")
 	return &DBClient{DB: db}
 }
 
 // SetupTable sets up a table.
 func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, indexes []Index) {
-	log.Printf("[DB] Setting up table '%s' (Replace=%v)", tableName, isReplace)
+	Logf(LogTypeDB, "Setting up table '%s' (Replace=%v)", tableName, isReplace)
 	if isReplace {
 		c.DropTable(tableName)
 	}
@@ -70,7 +69,7 @@ func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, 
 
 // DropTable drops a table.
 func (c *DBClient) DropTable(tableName string) {
-	log.Printf("[DB] Dropping table '%s'", tableName)
+	Logf(LogTypeDB, "Dropping table '%s'", tableName)
 	_, err := c.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to drop table %s: %v", tableName, err))
@@ -79,7 +78,7 @@ func (c *DBClient) DropTable(tableName string) {
 
 // CleanTable deletes all data from a table.
 func (c *DBClient) CleanTable(tableName string) {
-	log.Printf("[DB] Cleaning table '%s'", tableName)
+	Logf(LogTypeDB, "Cleaning table '%s'", tableName)
 	_, err := c.DB.Exec(fmt.Sprintf("DELETE FROM %s", tableName))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to clean table %s: %v", tableName, err))
@@ -94,16 +93,16 @@ func (c *DBClient) CleanTable(tableName string) {
 // This sounds like copying FROM table 2 TO table 1? Or syncing?
 // Given the complexity, I will implement a basic version that might fail if not supported.
 func SetupTableFromAnother(destClient *DBClient, destTable string, srcClient *DBClient, srcTable string, isReplace bool) {
-	log.Printf("[DB] SetupTableFromAnother: %s -> %s (Replace=%v)", srcTable, destTable, isReplace)
+	Logf(LogTypeDB, "SetupTableFromAnother: %s -> %s (Replace=%v)", srcTable, destTable, isReplace)
 	// This is hard to do generically without knowing schema.
 	// For this exercise, I will log a warning that this feature is limited.
-	log.Println("SetupTableFromAnother is a placeholder. Implementing full table copy across connections is complex generic logic.")
+	Log(LogTypeDB, "SetupTableFromAnother Warning", "SetupTableFromAnother is a placeholder. Implementing full table copy across connections is complex generic logic.")
 }
 
 // ReplaceData inserts or replaces data.
 // Data is assumed to be a list of values matching columns order.
 func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
-	log.Printf("[DB] Replacing data in '%s': %v", tableName, values)
+	Log(LogTypeDB, fmt.Sprintf("Replacing data in '%s'", tableName), fmt.Sprintf("%v", values))
 	// We need to know placeholders.
 	placeholders := make([]string, len(values))
 	for i := range values {
@@ -127,7 +126,7 @@ func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
 
 // QueryData is a helper to run queries.
 func (c *DBClient) QueryData(query string, args ...interface{}) *sql.Rows {
-	log.Printf("[DB] Query: %s (args: %v)", query, args)
+	Log(LogTypeDB, "Query Data", fmt.Sprintf("Query: %s\nArgs: %v", query, args))
 	rows, err := c.DB.Query(query, args...)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to query data: %v", err))

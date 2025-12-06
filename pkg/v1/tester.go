@@ -2,7 +2,6 @@ package v1
 
 import (
 	"fmt"
-	"log"
 	"sync"
 )
 
@@ -51,15 +50,15 @@ func (t *Tester) RunStageByName(name string) (err error) {
 		return fmt.Errorf("stage %s not found", name)
 	}
 
-	log.Printf("=== Running Stage: %s ===", name)
+	Log(LogTypeStage, fmt.Sprintf("Running Stage: %s", name), "")
 	// Error handling in stages should be handled by panic/recover or other means if we want to stop execution
 	// For this lib, we assume stages might panic on failure.
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("=== Stage %s FAILED: %v ===", name, r)
+			Log(LogTypeStage, fmt.Sprintf("Stage %s FAILED", name), fmt.Sprintf("%v", r))
 			err = fmt.Errorf("panic: %v", r)
 		} else {
-			log.Printf("=== Stage %s PASSED ===", name)
+			Log(LogTypeStage, fmt.Sprintf("Stage %s PASSED", name), "")
 		}
 	}()
 	fn()

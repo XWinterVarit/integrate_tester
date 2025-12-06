@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"sync"
 )
@@ -36,9 +36,9 @@ func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer
 	}
 
 	go func() {
-		log.Printf("[Mock] Starting Server on %s", port)
+		Logf(LogTypeMock, "Starting Server on %s", port)
 		if err := ms.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[Mock] Server failed: %v", err)
+			Log(LogTypeMock, "Server failed", fmt.Sprintf("%v", err))
 		}
 	}()
 
@@ -49,7 +49,7 @@ func RunMockServer(port string, handlers map[string]MockHandlerFunc) *MockServer
 // It merges or replaces? The requirement says "UpdateMockServer".
 // Usually replacing the map is safer/cleaner for a "stage" change.
 func UpdateMockServer(ms *MockServer, handlers map[string]MockHandlerFunc) {
-	log.Printf("[Mock] Updating server handlers")
+	Log(LogTypeMock, "Updating server handlers", "")
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	// We can merge or replace.
@@ -77,7 +77,7 @@ func (ms *MockServer) handle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Try generic catch-all if needed? Or 404.
 		// For now 404.
-		log.Printf("[Mock] Handled Request: %s %s -> 404 Not Found", r.Method, r.URL.Path)
+		Logf(LogTypeMock, "Handled Request: %s %s -> 404 Not Found", r.Method, r.URL.Path)
 		http.NotFound(w, r)
 		return
 	}
@@ -85,7 +85,7 @@ func (ms *MockServer) handle(w http.ResponseWriter, r *http.Request) {
 	reqWrapper := NewRequestWrapper(r)
 	resp := handler(reqWrapper)
 
-	log.Printf("[Mock] Handled Request: %s %s -> %d", r.Method, r.URL.Path, resp.StatusCode)
+	Log(LogTypeMock, fmt.Sprintf("Handled Request: %s %s -> %d", r.Method, r.URL.Path, resp.StatusCode), fmt.Sprintf("Response Body: %s\nHeaders: %v", resp.Body, resp.Header))
 
 	for k, v := range resp.Header {
 		w.Header().Set(k, v)
