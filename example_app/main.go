@@ -1,0 +1,128 @@
+package main
+
+import (
+	"database/sql"
+	"flag"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
+	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/sijms/go-ora/v2"
+)
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func main() {
+	// Oracle connection info from requirement
+	user := flag.String("user", getEnv("ORA_USER", "LEARN1"), "Oracle username")
+	pass := flag.String("pass", getEnv("ORA_PASS", "Welcome"), "Oracle password")
+	host := flag.String("host", getEnv("ORA_HOST", "localhost"), "Oracle host")
+	port := flag.String("port", getEnv("ORA_PORT", "1521"), "Oracle port")
+	service := flag.String("service", getEnv("ORA_SERVICE", "XE"), "Oracle service name")
+
+	// Flags for testing/flexibility
+	driver := flag.String("driver", "oracle", "Database driver (oracle, sqlite3)")
+	dsnOverride := flag.String("dsn", "", "DSN override (for sqlite or custom)")
+
+	flag.Parse()
+
+	var dsn string
+	if *dsnOverride != "" {
+		dsn = *dsnOverride
+	} else {
+		// Construct Oracle DSN (go-ora URL format)
+		dsn = fmt.Sprintf("oracle://%s:%s@%s:%s/%s", *user, *pass, *host, *port, *service)
+	}
+
+	log.Printf("Connecting to DB: %s (%s)", *driver, dsn)
+	db, err := sql.Open(*driver, dsn)
+	if err != nil {
+		log.Fatalf("Failed to open DB: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping DB: %v", err)
+	}
+
+	// API: Update Data
+	// GET /update?id=1&status=new_status
+	http.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		status := r.URL.Query().Get("status")
+
+		if id == "" || status == "" {
+			http.Error(w, "Missing id or status", http.StatusBadRequest)
+			return
+		}
+
+		var query string
+		if *driver == "sqlite3" {
+			query = "UPDATE users SET status = ? WHERE id = ?"
+		} else {
+			query = "UPDATE users SET status = :1 WHERE id = :2"
+		}
+
+		_, err := db.Exec(query, status, id)
+		if err != nil {
+			log.Printf("Update error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"result": "ok"}`))
+	})
+
+	// API: Read Data
+	// GET /read?id=1
+	// Requirement: "read data ... and expected something, if not return error"
+	// Logic: If status is "error", return 500. Else return 200 with JSON.
+	http.HandleFunc("/read", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "Missing id", http.StatusBadRequest)
+			return
+		}
+
+		var query string
+		if *driver == "sqlite3" {
+			query = "SELECT status FROM users WHERE id = ?"
+		} else {
+			query = "SELECT status FROM users WHERE id = :1"
+		}
+
+		var status string
+		err := db.QueryRow(query, id).Scan(&status)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Not found", http.StatusNotFound)
+			} else {
+				log.Printf("Read error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Simulate "Expected Something" logic
+		if status == "bad" || status == "error" {
+			http.Error(w, "Data in invalid state", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"id": "%s", "status": "%s"}`, id, status)
+	})
+
+	log.Println("Server listening on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatal(err)
+	}
+}

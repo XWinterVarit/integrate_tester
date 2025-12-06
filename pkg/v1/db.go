@@ -19,7 +19,8 @@ type Index struct {
 
 // DBClient wraps the sql.DB connection.
 type DBClient struct {
-	DB *sql.DB
+	DB         *sql.DB
+	DriverName string
 }
 
 // Connect connects to the database.
@@ -27,18 +28,18 @@ type DBClient struct {
 func Connect(driverName, dataSourceName string) *DBClient {
 	RecordAction(fmt.Sprintf("DB Connect: %s", driverName), func() { Connect(driverName, dataSourceName) })
 	if IsDryRun() {
-		return &DBClient{}
+		return &DBClient{DriverName: driverName}
 	}
 	Logf(LogTypeDB, "Connecting to %s", driverName)
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to DB: %v", err))
+		Fail("Failed to connect to DB: %v", err)
 	}
 	if err := db.Ping(); err != nil {
-		panic(fmt.Sprintf("Failed to ping DB: %v", err))
+		Fail("Failed to ping DB: %v", err)
 	}
 	Log(LogTypeDB, "Connected successfully", "")
-	return &DBClient{DB: db}
+	return &DBClient{DB: db, DriverName: driverName}
 }
 
 // SetupTable sets up a table.
@@ -48,7 +49,7 @@ func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, 
 		return
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected (possibly running a DryRun captured action without real execution context)")
+		Fail("DBClient is not connected (possibly running a DryRun captured action without real execution context)")
 	}
 	Logf(LogTypeDB, "Setting up table '%s' (Replace=%v)", tableName, isReplace)
 	if isReplace {
@@ -61,19 +62,39 @@ func (c *DBClient) SetupTable(tableName string, isReplace bool, fields []Field, 
 		fieldDefs = append(fieldDefs, fmt.Sprintf("%s %s", f.Name, f.Type))
 	}
 
-	query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, strings.Join(fieldDefs, ", "))
+	var query string
+	if c.DriverName == "oracle" {
+		query = fmt.Sprintf("CREATE TABLE %s (%s)", tableName, strings.Join(fieldDefs, ", "))
+	} else {
+		query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, strings.Join(fieldDefs, ", "))
+	}
+
 	_, err := c.DB.Exec(query)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create table %s: %v", tableName, err))
+		// If Oracle and table exists (ORA-00955), treat as success if we were mimicking IF NOT EXISTS
+		if c.DriverName == "oracle" && strings.Contains(err.Error(), "ORA-00955") {
+			// Ignored
+		} else {
+			Fail("Failed to create table %s: %v", tableName, err)
+		}
 	}
 
 	// Create Indexes
 	for i, idx := range indexes {
 		idxName := fmt.Sprintf("idx_%s_%d", tableName, i)
-		idxQuery := fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", idxName, tableName, strings.Join(idx.Columns, ", "))
+		var idxQuery string
+		if c.DriverName == "oracle" {
+			idxQuery = fmt.Sprintf("CREATE INDEX %s ON %s (%s)", idxName, tableName, strings.Join(idx.Columns, ", "))
+		} else {
+			idxQuery = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", idxName, tableName, strings.Join(idx.Columns, ", "))
+		}
 		_, err := c.DB.Exec(idxQuery)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to create index on %s: %v", tableName, err))
+			if c.DriverName == "oracle" && strings.Contains(err.Error(), "ORA-00955") {
+				// Ignored
+			} else {
+				Fail("Failed to create index on %s: %v", tableName, err)
+			}
 		}
 	}
 }
@@ -85,12 +106,26 @@ func (c *DBClient) DropTable(tableName string) {
 		return
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected")
+		Fail("DBClient is not connected")
 	}
 	Logf(LogTypeDB, "Dropping table '%s'", tableName)
-	_, err := c.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+
+	var query string
+	if c.DriverName == "oracle" {
+		// Oracle 11g/12c does not support DROP TABLE IF EXISTS.
+		// Use PL/SQL block to ignore ORA-00942 (table does not exist).
+		query = fmt.Sprintf(`BEGIN
+			EXECUTE IMMEDIATE 'DROP TABLE %s PURGE';
+			EXCEPTION WHEN OTHERS THEN
+				IF SQLCODE != -942 THEN RAISE; END IF;
+			END;`, tableName)
+	} else {
+		query = fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	}
+
+	_, err := c.DB.Exec(query)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to drop table %s: %v", tableName, err))
+		Fail("Failed to drop table %s: %v", tableName, err)
 	}
 }
 
@@ -101,12 +136,12 @@ func (c *DBClient) CleanTable(tableName string) {
 		return
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected")
+		Fail("DBClient is not connected")
 	}
 	Logf(LogTypeDB, "Cleaning table '%s'", tableName)
 	_, err := c.DB.Exec(fmt.Sprintf("DELETE FROM %s", tableName))
 	if err != nil {
-		panic(fmt.Sprintf("Failed to clean table %s: %v", tableName, err))
+		Fail("Failed to clean table %s: %v", tableName, err)
 	}
 }
 
@@ -132,15 +167,17 @@ func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
 		return
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected")
+		Fail("DBClient is not connected")
 	}
 	Log(LogTypeDB, fmt.Sprintf("Replacing data in '%s'", tableName), fmt.Sprintf("%v", values))
 	// We need to know placeholders.
 	placeholders := make([]string, len(values))
 	for i := range values {
-		placeholders[i] = "?" // Standard for many, but Postgres uses $1.
-		// Since we want "easy", we might need to handle this.
-		// But for now, let's use ? and assume sqlite/mysql style or generic driver handling.
+		if c.DriverName == "oracle" {
+			placeholders[i] = fmt.Sprintf(":%d", i+1)
+		} else {
+			placeholders[i] = "?" // Standard for many, but Postgres uses $1.
+		}
 	}
 
 	// "REPLACE INTO" is MySQL/SQLite specific. Postgres uses "INSERT ... ON CONFLICT".
@@ -152,7 +189,7 @@ func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
 	query := fmt.Sprintf("INSERT INTO %s VALUES (%s)", tableName, strings.Join(placeholders, ", "))
 	_, err := c.DB.Exec(query, values...)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to insert/replace data into %s: %v", tableName, err))
+		Fail("Failed to insert/replace data into %s: %v", tableName, err)
 	}
 }
 
@@ -163,12 +200,24 @@ func (c *DBClient) QueryData(query string, args ...interface{}) *sql.Rows {
 		return nil
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected")
+		Fail("DBClient is not connected")
 	}
-	Log(LogTypeDB, "Query Data", fmt.Sprintf("Query: %s\nArgs: %v", query, args))
-	rows, err := c.DB.Query(query, args...)
+
+	finalQuery := query
+	if c.DriverName == "oracle" {
+		// Replace ? with :n
+		argCounter := 1
+		count := strings.Count(query, "?")
+		for i := 0; i < count; i++ {
+			finalQuery = strings.Replace(finalQuery, "?", fmt.Sprintf(":%d", argCounter), 1)
+			argCounter++
+		}
+	}
+
+	Log(LogTypeDB, "Query Data", fmt.Sprintf("Query: %s\nArgs: %v", finalQuery, args))
+	rows, err := c.DB.Query(finalQuery, args...)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to query data: %v", err))
+		Fail("Failed to query data: %v", err)
 	}
 	return rows
 }
@@ -196,7 +245,7 @@ func (c *DBClient) Fetch(query string, args ...interface{}) *QueryResult {
 
 	columns, err := rows.Columns()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get columns: %v", err))
+		Fail("Failed to get columns: %v", err)
 	}
 
 	var results []RowResult
@@ -210,7 +259,7 @@ func (c *DBClient) Fetch(query string, args ...interface{}) *QueryResult {
 		}
 
 		if err := rows.Scan(valuePtrs...); err != nil {
-			panic(fmt.Sprintf("Failed to scan row: %v", err))
+			Fail("Failed to scan row: %v", err)
 		}
 
 		rowData := make(map[string]interface{})
@@ -218,10 +267,11 @@ func (c *DBClient) Fetch(query string, args ...interface{}) *QueryResult {
 			val := values[i]
 
 			// Handle []byte as string for convenience, common in some drivers/types
+			key := strings.ToLower(col)
 			if b, ok := val.([]byte); ok {
-				rowData[col] = string(b)
+				rowData[key] = string(b)
 			} else {
-				rowData[col] = val
+				rowData[key] = val
 			}
 		}
 		results = append(results, RowResult{Data: rowData})
@@ -240,7 +290,7 @@ func (c *DBClient) Update(tableName string, updates map[string]interface{}, wher
 		return
 	}
 	if c.DB == nil {
-		panic("DBClient is not connected")
+		Fail("DBClient is not connected")
 	}
 
 	if len(updates) == 0 {
@@ -249,22 +299,40 @@ func (c *DBClient) Update(tableName string, updates map[string]interface{}, wher
 
 	var sets []string
 	var values []interface{}
+	argCounter := 1
 
 	for col, val := range updates {
-		sets = append(sets, fmt.Sprintf("%s = ?", col))
+		ph := "?"
+		if c.DriverName == "oracle" {
+			ph = fmt.Sprintf(":%d", argCounter)
+			argCounter++
+		}
+		sets = append(sets, fmt.Sprintf("%s = %s", col, ph))
 		values = append(values, val)
+	}
+
+	// Handle where clause
+	finalWhere := where
+	if c.DriverName == "oracle" {
+		// Replace ? with :n
+		// Naive replacement
+		count := strings.Count(where, "?")
+		for i := 0; i < count; i++ {
+			finalWhere = strings.Replace(finalWhere, "?", fmt.Sprintf(":%d", argCounter), 1)
+			argCounter++
+		}
 	}
 
 	// Append WHERE args
 	values = append(values, args...)
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", tableName, strings.Join(sets, ", "), where)
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", tableName, strings.Join(sets, ", "), finalWhere)
 
 	Log(LogTypeDB, "Update Table", fmt.Sprintf("Query: %s\nArgs: %v", query, values))
 
 	_, err := c.DB.Exec(query, values...)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to update table %s: %v", tableName, err))
+		Fail("Failed to update table %s: %v", tableName, err)
 	}
 }
 
@@ -273,7 +341,7 @@ func (c *DBClient) Update(tableName string, updates map[string]interface{}, wher
 // GetRow returns the row at the specified index. Panics if index is out of bounds.
 func (qr *QueryResult) GetRow(index int) *RowResult {
 	if index < 0 || index >= len(qr.Rows) {
-		panic(fmt.Sprintf("GetRow: index %d out of bounds (count: %d)", index, len(qr.Rows)))
+		Fail("GetRow: index %d out of bounds (count: %d)", index, len(qr.Rows))
 	}
 	return &qr.Rows[index]
 }
@@ -283,13 +351,22 @@ func (qr *QueryResult) Count() int {
 	return len(qr.Rows)
 }
 
+// ExpectCount asserts that the number of rows matches the expected count.
+func (qr *QueryResult) ExpectCount(expected int) {
+	count := qr.Count()
+	if count != expected {
+		Fail("Expected Row Count %d, got %d", expected, count)
+	}
+	Logf(LogTypeExpect, "Row Count %d == %d - PASSED", count, expected)
+}
+
 // --- RowResult Helpers ---
 
 // Get returns the value of a field. Panics if field does not exist.
 func (r *RowResult) Get(field string) interface{} {
-	val, ok := r.Data[field]
+	val, ok := r.Data[strings.ToLower(field)]
 	if !ok {
-		panic(fmt.Sprintf("Field '%s' not found in row", field))
+		Fail("Field '%s' not found in row", field)
 	}
 	return val
 }
@@ -302,7 +379,7 @@ func (r *RowResult) GetTo(field string, target interface{}) {
 	// Let's use fmt.Sprintf -> Sscan for "easy" flexible conversion
 	sVal := fmt.Sprintf("%v", val)
 	if _, err := fmt.Sscan(sVal, target); err != nil {
-		panic(fmt.Sprintf("Failed to scan field '%s' (val=%v) into target: %v", field, val, err))
+		Fail("Failed to scan field '%s' (val=%v) into target: %v", field, val, err)
 	}
 }
 
@@ -316,7 +393,7 @@ func (r *RowResult) Expect(field string, expected interface{}) {
 		sVal := fmt.Sprintf("%v", val)
 		sExp := fmt.Sprintf("%v", expected)
 		if sVal != sExp {
-			panic(fmt.Sprintf("Expect failed for field '%s': expected '%v', got '%v'", field, expected, val))
+			Fail("Expect failed for field '%s': expected '%v', got '%v'", field, expected, val)
 		}
 	}
 	Logf(LogTypeExpect, "DB Field '%s' == '%v' - PASSED", field, expected)

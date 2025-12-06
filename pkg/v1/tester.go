@@ -141,8 +141,13 @@ func (t *Tester) RunStageByName(name string) (err error) {
 	// For this lib, we assume stages might panic on failure.
 	defer func() {
 		if r := recover(); r != nil {
-			Log(LogTypeStage, fmt.Sprintf("Stage %s FAILED", name), fmt.Sprintf("%v", r))
-			err = fmt.Errorf("panic: %v", r)
+			if te, ok := r.(TestError); ok {
+				Log(LogTypeStage, fmt.Sprintf("Stage %s FAILED", name), te.Message)
+				err = fmt.Errorf("failed: %s", te.Message)
+			} else {
+				Log(LogTypeStage, fmt.Sprintf("Stage %s FAILED (Crash)", name), fmt.Sprintf("%v", r))
+				err = fmt.Errorf("panic: %v", r)
+			}
 		} else {
 			Log(LogTypeStage, fmt.Sprintf("Stage %s PASSED", name), "")
 		}

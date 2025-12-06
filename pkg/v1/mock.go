@@ -58,7 +58,7 @@ func UpdateMockServer(ms *MockServer, handlers map[string]MockHandlerFunc) {
 		return
 	}
 	if ms.server == nil {
-		panic("MockServer is not running (possibly running a DryRun captured action without real execution context)")
+		Fail("MockServer is not running (possibly running a DryRun captured action without real execution context)")
 	}
 	Log(LogTypeMock, "Updating server handlers", "")
 	ms.mu.Lock()

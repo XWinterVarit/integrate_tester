@@ -23,8 +23,7 @@ func RunAppServer(path string, args ...string) *AppServer {
 
 	Logf(LogTypeApp, "Starting Server: %s %v", path, args)
 	if err := cmd.Start(); err != nil {
-		Log(LogTypeApp, "Failed to start server", fmt.Sprintf("%v", err))
-		return nil
+		Fail("Failed to start server: %v", err)
 	}
 
 	return &AppServer{cmd: cmd}

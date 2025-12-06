@@ -108,7 +108,12 @@ func RunGUI(t *Tester) {
 						go func() {
 							defer func() {
 								if r := recover(); r != nil {
-									errMsg := fmt.Sprintf("%v", r)
+									var errMsg string
+									if te, ok := r.(TestError); ok {
+										errMsg = te.Message
+									} else {
+										errMsg = fmt.Sprintf("%v", r)
+									}
 									Log(LogTypeInfo, "Manual Run FAILED: "+action.Summary, errMsg)
 									fyne.Do(func() {
 										dialog.ShowError(fmt.Errorf("Execution Failed: %s", errMsg), myWindow)
@@ -276,6 +281,8 @@ func RunGUI(t *Tester) {
 				icon = "⚙️"
 			case LogTypeExpect:
 				icon = "🎯"
+			case LogTypeError:
+				icon = "❌"
 			case LogTypeInfo:
 				icon = "ℹ️"
 			}

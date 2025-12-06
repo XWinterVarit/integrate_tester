@@ -23,7 +23,7 @@ func SendRequest(url string) Response {
 		// Let's panic to show the test failed immediately?
 		// Or return error? The example: resp := Request(...); Expect...
 		// If Request fails, Expect will likely fail or panic.
-		panic(fmt.Sprintf("Request failed: %v", err))
+		Fail("Request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -44,13 +44,25 @@ func SendRequest(url string) Response {
 	}
 }
 
+// ExpectStatusCode asserts that the response status code matches the expected code.
+func ExpectStatusCode(resp Response, expected int) {
+	if IsDryRun() {
+		return
+	}
+	if resp.StatusCode != expected {
+		// Include body in failure message for debugging
+		Fail("Expected Status Code %d, got %d. Body: %s", expected, resp.StatusCode, resp.Body)
+	}
+	Logf(LogTypeExpect, "Status Code %d == %d - PASSED", resp.StatusCode, expected)
+}
+
 // ExpectHeader asserts that the response has the expected header.
 func ExpectHeader(resp Response, key, value string) {
 	if IsDryRun() {
 		return
 	}
 	if got, ok := resp.Header[key]; !ok || got != value {
-		panic(fmt.Sprintf("ExpectHeader failed: expected %s=%s, got %s", key, value, got))
+		Fail("ExpectHeader failed: expected %s=%s, got %s", key, value, got)
 	}
 	Logf(LogTypeExpect, "Header '%s' == '%s' - PASSED", key, value)
 }
@@ -63,21 +75,21 @@ func ExpectJsonBody(resp Response, expectedJson interface{}) {
 	}
 	var got interface{}
 	if err := json.Unmarshal([]byte(resp.Body), &got); err != nil {
-		panic(fmt.Sprintf("ExpectJsonBody failed: response body is not valid JSON: %v. Body: %s", err, resp.Body))
+		Fail("ExpectJsonBody failed: response body is not valid JSON: %v. Body: %s", err, resp.Body)
 	}
 
 	// If expectedJson is string, unmarshal it too
 	var expected interface{}
 	if s, ok := expectedJson.(string); ok {
 		if err := json.Unmarshal([]byte(s), &expected); err != nil {
-			panic(fmt.Sprintf("ExpectJsonBody failed: expectedJson string is not valid JSON: %v", err))
+			Fail("ExpectJsonBody failed: expectedJson string is not valid JSON: %v", err)
 		}
 	} else {
 		expected = expectedJson
 	}
 
 	if !reflect.DeepEqual(got, expected) {
-		panic(fmt.Sprintf("ExpectJsonBody failed:\nExpected: %v\nGot:      %v", expected, got))
+		Fail("ExpectJsonBody failed:\nExpected: %v\nGot:      %v", expected, got)
 	}
 	Log(LogTypeExpect, "JSON body matches expected value - PASSED", "")
 }

@@ -16,6 +16,7 @@ const (
 	LogTypeMock    LogType = "Mock"
 	LogTypeApp     LogType = "App"
 	LogTypeExpect  LogType = "Expect"
+	LogTypeError   LogType = "Error"
 	LogTypeInfo    LogType = "Info"
 )
 
