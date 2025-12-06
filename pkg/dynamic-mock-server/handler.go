@@ -130,39 +130,53 @@ func (h *HandlerExecutor) resolveArg(arg interface{}) interface{} {
 
 func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 	args := f.Args
-	if len(args) < 5 {
-		return nil
-	}
-	// Common signature: (Field/Key, Condition, Value, DynamicVariable, ToBeValue)
-
-	// Check Condition
-	condition := fmt.Sprintf("%v", args[1])
-	expectedVal := h.resolveArg(args[2])
-	targetVar := fmt.Sprintf("%v", args[3])
-	toBeVal := h.resolveArg(args[4])
-
+	var condition string
+	var expectedVal interface{}
+	var targetVar string
+	var toBeVal interface{}
 	var actualVal interface{}
 
 	switch f.Func {
 	case FuncIfRequestHeader:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
 		headerName := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.Header.Get(headerName)
 	case FuncIfRequestJsonBody:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
 		fieldPath := fmt.Sprintf("%v", args[0])
 		actualVal = h.getJSONPath(fieldPath)
 	case FuncIfRequestPath:
-		// Path func signature: (Condition, Value, DynamicVar, ToBeVal) - 4 args
-		// But general signature is 5. Let's adjust.
-		// Req: IfRequestPath(Condition, Value, DynamicVariable, toBeValue)
-		// So args: [Condition, Value, Var, ToBe]
-		// My generic parsing above used indices 1,2,3,4.
-		// Let's re-parse specifically.
+		if len(args) < 4 {
+			return nil
+		}
 		condition = fmt.Sprintf("%v", args[0])
 		expectedVal = h.resolveArg(args[1])
 		targetVar = fmt.Sprintf("%v", args[2])
 		toBeVal = h.resolveArg(args[3])
 		actualVal = h.Request.URL.Path
 	case FuncIfRequestQuery:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
 		queryField := fmt.Sprintf("%v", args[0])
 		actualVal = h.Request.URL.Query().Get(queryField)
 	}
