@@ -172,3 +172,152 @@ func (c *DBClient) QueryData(query string, args ...interface{}) *sql.Rows {
 	}
 	return rows
 }
+
+// --- Simplified Query/Update API ---
+
+// QueryResult holds the results of a Fetch operation.
+type QueryResult struct {
+	Rows []RowResult
+}
+
+// RowResult represents a single row from the database.
+type RowResult struct {
+	Data map[string]interface{}
+}
+
+// Fetch executes a query and returns all results in an easy-to-use QueryResult object.
+func (c *DBClient) Fetch(query string, args ...interface{}) *QueryResult {
+	RecordAction("DB Fetch", func() { c.Fetch(query, args...) })
+	if IsDryRun() {
+		return &QueryResult{}
+	}
+	rows := c.QueryData(query, args...)
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get columns: %v", err))
+	}
+
+	var results []RowResult
+
+	for rows.Next() {
+		// Prepare a slice of interface{} to hold values
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			panic(fmt.Sprintf("Failed to scan row: %v", err))
+		}
+
+		rowData := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+
+			// Handle []byte as string for convenience, common in some drivers/types
+			if b, ok := val.([]byte); ok {
+				rowData[col] = string(b)
+			} else {
+				rowData[col] = val
+			}
+		}
+		results = append(results, RowResult{Data: rowData})
+	}
+
+	return &QueryResult{Rows: results}
+}
+
+// Update performs a partial update on a table based on a condition.
+// updates: map of column name -> new value
+// where: condition string (e.g., "id = ?")
+// args: arguments for the where clause
+func (c *DBClient) Update(tableName string, updates map[string]interface{}, where string, args ...interface{}) {
+	RecordAction(fmt.Sprintf("DB Update: %s", tableName), func() { c.Update(tableName, updates, where, args...) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		panic("DBClient is not connected")
+	}
+
+	if len(updates) == 0 {
+		return
+	}
+
+	var sets []string
+	var values []interface{}
+
+	for col, val := range updates {
+		sets = append(sets, fmt.Sprintf("%s = ?", col))
+		values = append(values, val)
+	}
+
+	// Append WHERE args
+	values = append(values, args...)
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", tableName, strings.Join(sets, ", "), where)
+
+	Log(LogTypeDB, "Update Table", fmt.Sprintf("Query: %s\nArgs: %v", query, values))
+
+	_, err := c.DB.Exec(query, values...)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to update table %s: %v", tableName, err))
+	}
+}
+
+// --- QueryResult Helpers ---
+
+// GetRow returns the row at the specified index. Panics if index is out of bounds.
+func (qr *QueryResult) GetRow(index int) *RowResult {
+	if index < 0 || index >= len(qr.Rows) {
+		panic(fmt.Sprintf("GetRow: index %d out of bounds (count: %d)", index, len(qr.Rows)))
+	}
+	return &qr.Rows[index]
+}
+
+// Count returns the number of rows.
+func (qr *QueryResult) Count() int {
+	return len(qr.Rows)
+}
+
+// --- RowResult Helpers ---
+
+// Get returns the value of a field. Panics if field does not exist.
+func (r *RowResult) Get(field string) interface{} {
+	val, ok := r.Data[field]
+	if !ok {
+		panic(fmt.Sprintf("Field '%s' not found in row", field))
+	}
+	return val
+}
+
+// GetTo scans the value of a field into the target pointer.
+func (r *RowResult) GetTo(field string, target interface{}) {
+	val := r.Get(field)
+	// Basic type matching or conversion could go here.
+	// For simplicity, we rely on fmt.Sscan or simple assignment if types match.
+	// Let's use fmt.Sprintf -> Sscan for "easy" flexible conversion
+	sVal := fmt.Sprintf("%v", val)
+	if _, err := fmt.Sscan(sVal, target); err != nil {
+		panic(fmt.Sprintf("Failed to scan field '%s' (val=%v) into target: %v", field, val, err))
+	}
+}
+
+// Expect asserts that the field exists and equals the expected value.
+func (r *RowResult) Expect(field string, expected interface{}) {
+	val := r.Get(field)
+
+	// Simple comparison.
+	// To handle int vs int64 issues common in DBs, we convert both to string for comparison if direct equality fails.
+	if val != expected {
+		sVal := fmt.Sprintf("%v", val)
+		sExp := fmt.Sprintf("%v", expected)
+		if sVal != sExp {
+			panic(fmt.Sprintf("Expect failed for field '%s': expected '%v', got '%v'", field, expected, val))
+		}
+	}
+	Logf(LogTypeExpect, "DB Field '%s' == '%v' - PASSED", field, expected)
+}
