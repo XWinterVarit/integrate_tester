@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 8888, "Port for the mock controller")
+	port := flag.Int("port", 9001, "Port for the mock controller")
 	logFile := flag.String("log", "", "Log file path (default: stdout)")
 	flag.Parse()
 

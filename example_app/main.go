@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -30,6 +31,7 @@ func main() {
 	// Flags for testing/flexibility
 	driver := flag.String("driver", "oracle", "Database driver (oracle, sqlite3)")
 	dsnOverride := flag.String("dsn", "", "DSN override (for sqlite or custom)")
+	mockService := flag.String("mock-service", "", "URL of the mock service")
 
 	flag.Parse()
 
@@ -119,6 +121,45 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"id": "%s", "status": "%s"}`, id, status)
+	})
+
+	// API: Call Mock
+	// GET /call-mock
+	http.HandleFunc("/call-mock", func(w http.ResponseWriter, r *http.Request) {
+		if *mockService == "" {
+			http.Error(w, "Mock service URL not configured", http.StatusInternalServerError)
+			return
+		}
+
+		mockURL := *mockService + "/mock-test"
+		userType := r.URL.Query().Get("user_type")
+		if userType != "" {
+			mockURL += "?user_type=" + userType
+		}
+
+		log.Printf("Calling mock: %s", mockURL)
+		resp, err := http.Get(mockURL)
+		if err != nil {
+			log.Printf("Call mock error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Proxy headers
+		for k, v := range resp.Header {
+			for _, vv := range v {
+				w.Header().Add(k, vv)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		w.Write(body)
 	})
 
 	log.Println("Server listening on :8080")

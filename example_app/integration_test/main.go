@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	v1 "integrate_tester/pkg/v1"
 
@@ -11,10 +12,13 @@ import (
 )
 
 func main() {
-	mockUrl := flag.String("mock-url", "http://localhost:8888", "Mock Server Control URL")
+	mockUrl := flag.String("mock-url", "http://localhost:9001", "Mock Server Control URL")
 	flag.Parse()
 
 	t := v1.NewTester()
+	// Mock Service Port (where the actual mocked service will listen)
+	mockPort := 9002
+
 	var app *v1.AppServer
 	// DB client for the test runner to manipulate DB
 	var db *v1.DBClient
@@ -24,6 +28,8 @@ func main() {
 		if _, err := os.Stat(appPath); os.IsNotExist(err) {
 			if _, err := os.Stat("example_app_bin"); err == nil {
 				appPath = "./example_app_bin"
+			} else {
+				v1.Fail("Application binary 'example_app_bin' not found. Please build it: go build -o example_app_bin example_app/main.go")
 			}
 		}
 
@@ -45,7 +51,7 @@ func main() {
 		db.ReplaceData("users", []interface{}{1, "alice", "active"})
 
 		// 3. Run App
-		app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn)
+		app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn, "-mock-service", fmt.Sprintf("http://localhost:%d", mockPort))
 	})
 
 	t.Stage("Success Case", func() {
@@ -88,22 +94,38 @@ func main() {
 		// The mock server must be running separately (e.g., via docker or separate process)
 		client := v1.NewDynamicMockClient(*mockUrl)
 
-		// 2. Register a Route
-		// We'll use port 9002 for the mock service to avoid conflict with the main app (8080) and default control port (9001)
-		mockPort := 9002
+		// 2. Register a Route with Complex Logic
+		// We use mockPort defined in main
 		err := client.RegisterRoute(mockPort, "GET", "/mock-test", []v1.ResponseFuncConfig{
+			// Generator
+			v1.GenerateRandomInt(10, 50, "DISCOUNT"),
+
+			// Conditions
+			v1.IfRequestQuerySetCase("user_type", v1.ConditionEqual, "vip", "VIP"),
+
+			// Default Response
 			v1.SetStatusCode("", 200),
-			v1.SetJsonBody("", `{"message": "hello from mock"}`),
+			v1.SetJsonBody("", `{"message": "Hello User", "discount": 0}`),
 			v1.SetHeader("", "Content-Type", "application/json"),
+
+			// VIP Response
+			v1.SetStatusCode("VIP", 200),
+			v1.SetJsonBody("VIP", `{"message": "Hello VIP", "discount": {{.DISCOUNT}}}`),
 		})
 		v1.AssertNoError(err)
 
-		// 3. Verify the Mock
-		// Send a request to the mocked endpoint
-		resp := v1.SendRequest(fmt.Sprintf("http://localhost:%d/mock-test", mockPort))
-
+		// 3. Verify Default Case
+		resp := v1.SendRequest("http://localhost:8080/call-mock")
 		v1.ExpectStatusCode(resp, 200)
-		v1.ExpectJsonBody(resp, `{"message": "hello from mock"}`)
+		v1.ExpectJsonBody(resp, `{"message": "Hello User", "discount": 0}`)
+
+		// 4. Verify VIP Case
+		respVip := v1.SendRequest("http://localhost:8080/call-mock?user_type=vip")
+		v1.ExpectStatusCode(respVip, 200)
+		// Verify dynamic content
+		if !strings.Contains(respVip.Body, "Hello VIP") {
+			v1.Fail("Expected VIP message, got: %s", respVip.Body)
+		}
 	})
 
 	v1.RunGUI(t)
