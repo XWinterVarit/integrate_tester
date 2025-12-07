@@ -7,12 +7,10 @@ import (
 
 	v1 "integrate_tester/pkg/v1"
 
-	_ "github.com/mattn/go-sqlite3"
 	_ "github.com/sijms/go-ora/v2"
 )
 
 func main() {
-	target := flag.String("target", "oracle", "Target DB: oracle or sqlite3")
 	mockUrl := flag.String("mock-url", "http://localhost:8888", "Mock Server Control URL")
 	flag.Parse()
 
@@ -29,44 +27,25 @@ func main() {
 			}
 		}
 
-		if *target == "sqlite3" {
-			// 1. Connect to SQLite
-			db = v1.Connect("sqlite3", "./test.db")
+		// 1. Connect to Oracle
+		dsn := "oracle://LEARN1:Welcome@localhost:1521/XE"
+		db = v1.Connect("oracle", dsn)
 
-			// Prepare Table (SQLite syntax)
-			db.SetupTable("users", true, []v1.Field{
-				{"id", "INTEGER PRIMARY KEY"},
-				{"name", "TEXT"},
-				{"status", "TEXT"},
-			}, nil)
+		// Prepare Table (Oracle syntax)
+		// Note: Oracle 11g/12c differences exist. We use simple NUMBER for ID.
+		// Since ReplaceData provides ID, we don't need AUTO_INCREMENT/IDENTITY for this test.
+		// So we just need PRIMARY KEY constraint.
+		db.SetupTable("users", true, []v1.Field{
+			{"id", "NUMBER PRIMARY KEY"},
+			{"name", "VARCHAR2(100)"},
+			{"status", "VARCHAR2(50)"},
+		}, nil)
 
-			// 2. Insert Initial Data
-			db.ReplaceData("users", []interface{}{1, "alice", "active"})
+		// 2. Insert Initial Data
+		db.ReplaceData("users", []interface{}{1, "alice", "active"})
 
-			// 3. Run App
-			// Ensure "example_app_bin" exists (must be built)
-			app = v1.RunAppServer(appPath, "-driver", "sqlite3", "-dsn", "./test.db")
-		} else {
-			// 1. Connect to Oracle
-			dsn := "oracle://LEARN1:Welcome@localhost:1521/XE"
-			db = v1.Connect("oracle", dsn)
-
-			// Prepare Table (Oracle syntax)
-			// Note: Oracle 11g/12c differences exist. We use simple NUMBER for ID.
-			// Since ReplaceData provides ID, we don't need AUTO_INCREMENT/IDENTITY for this test.
-			// So we just need PRIMARY KEY constraint.
-			db.SetupTable("users", true, []v1.Field{
-				{"id", "NUMBER PRIMARY KEY"},
-				{"name", "VARCHAR2(100)"},
-				{"status", "VARCHAR2(50)"},
-			}, nil)
-
-			// 2. Insert Initial Data
-			db.ReplaceData("users", []interface{}{1, "alice", "active"})
-
-			// 3. Run App
-			app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn)
-		}
+		// 3. Run App
+		app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn)
 	})
 
 	t.Stage("Success Case", func() {
