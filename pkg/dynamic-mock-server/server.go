@@ -37,6 +37,7 @@ func (mc *MockController) Start() error {
 	mux.HandleFunc("/registerRoute", mc.handleRegisterRoute)
 	mux.HandleFunc("/resetPort", mc.handleResetPort)
 	mux.HandleFunc("/resetAll", mc.handleResetAll)
+	mux.HandleFunc("/", mc.handleNotFound)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", mc.ControlPort),
@@ -222,4 +223,13 @@ func (mc *MockController) handleMockRequest(port int, w http.ResponseWriter, r *
 		"port": port, "method": r.Method, "path": r.URL.Path, "status": executor.StatusCode,
 		"variables": executor.Variables,
 	})
+}
+
+func (mc *MockController) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	mc.Logger.Log("ControlRequest", 0, map[string]interface{}{
+		"path":   r.URL.Path,
+		"method": r.Method,
+		"status": 404,
+	})
+	http.NotFound(w, r)
 }

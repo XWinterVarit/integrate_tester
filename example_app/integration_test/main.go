@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	v1 "integrate_tester/pkg/v1"
@@ -12,6 +13,7 @@ import (
 
 func main() {
 	target := flag.String("target", "oracle", "Target DB: oracle or sqlite3")
+	mockUrl := flag.String("mock-url", "http://localhost:8888", "Mock Server Control URL")
 	flag.Parse()
 
 	t := v1.NewTester()
@@ -100,6 +102,29 @@ func main() {
 		if app != nil {
 			app.Stop()
 		}
+	})
+
+	t.Stage("Mock Server Example", func() {
+		// 1. Connect to the Mock Server
+		// The mock server must be running separately (e.g., via docker or separate process)
+		client := v1.NewDynamicMockClient(*mockUrl)
+
+		// 2. Register a Route
+		// We'll use port 9002 for the mock service to avoid conflict with the main app (8080) and default control port (9001)
+		mockPort := 9002
+		err := client.RegisterRoute(mockPort, "GET", "/mock-test", []v1.ResponseFuncConfig{
+			v1.SetStatusCode("", 200),
+			v1.SetJsonBody("", `{"message": "hello from mock"}`),
+			v1.SetHeader("", "Content-Type", "application/json"),
+		})
+		v1.AssertNoError(err)
+
+		// 3. Verify the Mock
+		// Send a request to the mocked endpoint
+		resp := v1.SendRequest(fmt.Sprintf("http://localhost:%d/mock-test", mockPort))
+
+		v1.ExpectStatusCode(resp, 200)
+		v1.ExpectJsonBody(resp, `{"message": "hello from mock"}`)
 	})
 
 	v1.RunGUI(t)

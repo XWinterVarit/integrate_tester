@@ -32,6 +32,12 @@ func NewLogger(filename string) (*Logger, error) {
 	}, nil
 }
 
+func NewConsoleLogger() *Logger {
+	return &Logger{
+		encoder: json.NewEncoder(os.Stdout),
+	}
+}
+
 func (l *Logger) Log(logType string, duration time.Duration, details interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
