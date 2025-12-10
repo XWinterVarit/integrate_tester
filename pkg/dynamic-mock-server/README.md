@@ -106,7 +106,7 @@ package main
 import (
     "log"
 
-    mockserver "github.com/cheevaritrodnuson/integrate_tester/pkg/dynamic-mock-server"
+    mockserver "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 func main() {

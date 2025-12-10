@@ -3,7 +3,7 @@ package v1
 import (
 	"testing"
 
-	dm "integrate_tester/pkg/dynamic-mock-server"
+	dm "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 func TestDynamicMockAliases(t *testing.T) {

@@ -1,7 +1,7 @@
 package v1
 
 import (
-	dm "integrate_tester/pkg/dynamic-mock-server"
+	dm "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 // DynamicMockClient is a wrapper around the dynamic mock server client.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	dms "integrate_tester/pkg/dynamic-mock-server"
+	dms "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 const (

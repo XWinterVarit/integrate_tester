@@ -1,4 +1,4 @@
-module integrate_tester
+module github.com/XWinterVarit/integrate_tester
 
 go 1.25
 

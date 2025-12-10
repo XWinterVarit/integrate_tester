@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	dms "integrate_tester/pkg/dynamic-mock-server"
+	dms "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 func runGeneratorExamples(client *dms.Client) {

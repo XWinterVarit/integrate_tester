@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	dms "integrate_tester/pkg/dynamic-mock-server"
+	dms "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 func runNewFeaturesExamples(client *dms.Client) {

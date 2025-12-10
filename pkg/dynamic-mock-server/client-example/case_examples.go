@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	dms "integrate_tester/pkg/dynamic-mock-server"
+	dms "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
 func runCaseExamples(client *dms.Client) {

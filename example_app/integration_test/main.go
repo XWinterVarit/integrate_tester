@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	v1 "integrate_tester/pkg/v1"
+	v1 "github.com/XWinterVarit/integrate_tester/pkg/v1"
 
 	_ "github.com/sijms/go-ora/v2"
 )
