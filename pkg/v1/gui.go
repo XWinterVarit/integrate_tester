@@ -178,6 +178,16 @@ func RunGUI(t *Tester) {
 		},
 	)
 
+	// Helper: discover actions without executing real operations (dry-run)
+	runDiscoverActions := func() {
+		go func() {
+			defer func() { recover() }()
+			log.Println("Discovering actions via dry-run...")
+			t.DryRunAll()
+			fyne.Do(func() { leftTree.Refresh() })
+		}()
+	}
+
 	// --- Right Pane: Log Tree ---
 	// Structure: Root -> Stage Logs -> Operation Logs (Click for Popup)
 	var rightTree *widget.Tree
@@ -388,8 +398,11 @@ func RunGUI(t *Tester) {
 	})
 
 	// Layout
+	stageHeader := container.NewBorder(nil, nil, nil, widget.NewButton("Refresh Actions", func() {
+		runDiscoverActions()
+	}), widget.NewLabelWithStyle("Test Stages", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}))
 	split := container.NewHSplit(
-		container.NewBorder(widget.NewLabelWithStyle("Test Stages", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, leftTree),
+		container.NewBorder(stageHeader, nil, nil, nil, leftTree),
 		container.NewBorder(widget.NewLabelWithStyle("Operation Logs", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), nil, nil, nil, rightTree),
 	)
 	split.SetOffset(0.35)
@@ -397,8 +410,8 @@ func RunGUI(t *Tester) {
 	myWindow.SetContent(split)
 	myWindow.Resize(fyne.NewSize(1000, 700))
 
-	// Pre-populate actions via Dry Run
-	t.DryRunAll()
+	// Pre-populate actions via dry-run discovery. This avoids executing real operations.
+	runDiscoverActions()
 
 	log.Println("Starting GUI window...")
 	myWindow.ShowAndRun()
