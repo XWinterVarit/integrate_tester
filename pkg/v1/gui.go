@@ -197,10 +197,14 @@ func RunGUI(t *Tester) {
 			defer logsMu.Unlock()
 
 			if uid == "" {
-				// Find all Stage Logs (Roots)
+				// Root nodes: stage logs as branches, plus any logs before the first stage
 				var ids []string
+				sawStage := false
 				for i, l := range logs {
-					if l.Type == LogTypeStage && strings.HasPrefix(l.Summary, "Running Stage:") {
+					if l.Type == LogTypeStage {
+						sawStage = true
+						ids = append(ids, fmt.Sprintf("%d", i))
+					} else if !sawStage {
 						ids = append(ids, fmt.Sprintf("%d", i))
 					}
 				}
@@ -219,16 +223,13 @@ func RunGUI(t *Tester) {
 			parentLog := logs[idx]
 
 			// Level 1: Stage -> Operations
-			if parentLog.Type == LogTypeStage && strings.HasPrefix(parentLog.Summary, "Running Stage:") {
+			if parentLog.Type == LogTypeStage {
 				var children []string
 				// Scan forward until next Stage log
 				for i := idx + 1; i < len(logs); i++ {
 					l := logs[i]
 					if l.Type == LogTypeStage {
-						// Stop at next "Running Stage"
-						if strings.HasPrefix(l.Summary, "Running Stage:") {
-							break
-						}
+						break
 					}
 					children = append(children, fmt.Sprintf("%d", i))
 				}
@@ -238,7 +239,7 @@ func RunGUI(t *Tester) {
 			return nil
 		},
 		func(uid widget.TreeNodeID) bool {
-			// Check if branch (Only Stage Headers are branches)
+			// Check if branch. Stage logs are branches; root entries before any stage are leaves.
 			logsMu.Lock()
 			defer logsMu.Unlock()
 
@@ -252,11 +253,11 @@ func RunGUI(t *Tester) {
 			}
 
 			l := logs[idx]
-			// Stage Logs are branches
-			if l.Type == LogTypeStage && strings.HasPrefix(l.Summary, "Running Stage:") {
+			if l.Type == LogTypeStage {
 				return true
 			}
 
+			// Non-stage logs that are roots (before first stage) are leaves
 			return false
 		},
 		func(branch bool) fyne.CanvasObject {

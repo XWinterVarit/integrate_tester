@@ -16,10 +16,10 @@ func (e TestError) Error() string {
 func Fail(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 
-	// In dry-run mode we only log and skip panicking so that action discovery can proceed
-	// without executing real operations or being stopped by setup checks.
+	// In dry-run mode we skip panicking and avoid emitting error logs so that
+	// discovery does not surface false failures when dependencies are absent.
 	if IsDryRun() {
-		Log(LogTypeError, "Assertion FAILED (dry-run, no panic)", msg)
+		Log(LogTypeInfo, "Assertion skipped in dry-run", msg)
 		return
 	}
 

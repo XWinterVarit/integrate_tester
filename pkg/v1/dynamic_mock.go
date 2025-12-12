@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"fmt"
+
 	dm "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
 )
 
@@ -29,8 +31,48 @@ const (
 // NewDynamicMockClient creates a new client for an existing dynamic mock server.
 // controlURL is the base URL of the mock controller (e.g., "http://localhost:8888").
 func NewDynamicMockClient(controlURL string) *DynamicMockClient {
+	RecordAction("Mock NewClient", func() { NewDynamicMockClient(controlURL) })
+	if IsDryRun() {
+		return &DynamicMockClient{}
+	}
 	client := dm.NewClient(controlURL)
 	return &DynamicMockClient{Client: client}
+}
+
+// RegisterRoute wraps the dynamic mock client, skipping external calls in dry-run mode.
+func (c *DynamicMockClient) RegisterRoute(port int, method string, path string, responseFuncs []ResponseFuncConfig) error {
+	RecordAction(fmt.Sprintf("Mock RegisterRoute: %s %s", method, path), func() { c.RegisterRoute(port, method, path, responseFuncs) })
+	if IsDryRun() {
+		return nil
+	}
+	if c == nil || c.Client == nil {
+		return fmt.Errorf("mock client is not initialized")
+	}
+	return c.Client.RegisterRoute(port, method, path, responseFuncs)
+}
+
+// ResetPort resets routes for a port. No-op in dry-run.
+func (c *DynamicMockClient) ResetPort(port int) error {
+	RecordAction(fmt.Sprintf("Mock ResetPort: %d", port), func() { c.ResetPort(port) })
+	if IsDryRun() {
+		return nil
+	}
+	if c == nil || c.Client == nil {
+		return fmt.Errorf("mock client is not initialized")
+	}
+	return c.Client.ResetPort(port)
+}
+
+// ResetAll resets all routes. No-op in dry-run.
+func (c *DynamicMockClient) ResetAll() error {
+	RecordAction("Mock ResetAll", func() { c.ResetAll() })
+	if IsDryRun() {
+		return nil
+	}
+	if c == nil || c.Client == nil {
+		return fmt.Errorf("mock client is not initialized")
+	}
+	return c.Client.ResetAll()
 }
 
 // Generator and Condition Functions Aliases

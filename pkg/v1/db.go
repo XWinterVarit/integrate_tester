@@ -406,6 +406,9 @@ func (c *DBClient) Update(tableName string, updates map[string]interface{}, wher
 
 // GetRow returns the row at the specified index. Panics if index is out of bounds.
 func (qr *QueryResult) GetRow(index int) *RowResult {
+	if IsDryRun() {
+		return &RowResult{Data: make(map[string]interface{})}
+	}
 	if index < 0 || index >= len(qr.Rows) {
 		Fail("GetRow: index %d out of bounds (count: %d)", index, len(qr.Rows))
 	}
@@ -419,6 +422,9 @@ func (qr *QueryResult) Count() int {
 
 // ExpectCount asserts that the number of rows matches the expected count.
 func (qr *QueryResult) ExpectCount(expected int) {
+	if IsDryRun() {
+		return
+	}
 	count := qr.Count()
 	if count != expected {
 		Fail("Expected Row Count %d, got %d", expected, count)
@@ -430,6 +436,9 @@ func (qr *QueryResult) ExpectCount(expected int) {
 
 // Get returns the value of a field. Panics if field does not exist.
 func (r *RowResult) Get(field string) interface{} {
+	if IsDryRun() {
+		return nil
+	}
 	val, ok := r.Data[strings.ToLower(field)]
 	if !ok {
 		Fail("Field '%s' not found in row", field)
@@ -439,6 +448,9 @@ func (r *RowResult) Get(field string) interface{} {
 
 // GetTo scans the value of a field into the target pointer.
 func (r *RowResult) GetTo(field string, target interface{}) {
+	if IsDryRun() {
+		return
+	}
 	val := r.Get(field)
 	// Basic type matching or conversion could go here.
 	// For simplicity, we rely on fmt.Sscan or simple assignment if types match.
@@ -451,6 +463,9 @@ func (r *RowResult) GetTo(field string, target interface{}) {
 
 // Expect asserts that the field exists and equals the expected value.
 func (r *RowResult) Expect(field string, expected interface{}) {
+	if IsDryRun() {
+		return
+	}
 	val := r.Get(field)
 
 	// Simple comparison.

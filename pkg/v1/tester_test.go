@@ -80,3 +80,23 @@ func TestDryRun(t *testing.T) {
 	})
 	tester.DryRunStage(tester.Stages[1])
 }
+
+func TestDryRunWithMockClient(t *testing.T) {
+	tester := NewTester()
+
+	tester.Stage("MockStage", func() {
+		client := NewDynamicMockClient("http://localhost:9001")
+		err := client.RegisterRoute(9002, "GET", "/mock-test", nil)
+		AssertNoError(err)
+
+		resp := SendRequest("http://localhost:8080/mock-test")
+		ExpectStatusCode(resp, 200)
+	})
+
+	tester.DryRunAll()
+
+	actions := GetStageActions("MockStage")
+	if len(actions) == 0 {
+		t.Fatalf("expected actions recorded during dry-run")
+	}
+}
