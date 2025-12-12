@@ -273,6 +273,8 @@ func RunGUI(t *Tester) {
 				isStage = true
 			case LogTypeDB:
 				icon = "🛢️"
+			case LogTypeRedis:
+				icon = "🧊"
 			case LogTypeRequest:
 				icon = "🌍"
 			case LogTypeMock:

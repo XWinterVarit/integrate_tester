@@ -12,6 +12,7 @@ type LogType string
 const (
 	LogTypeStage   LogType = "Stage"
 	LogTypeDB      LogType = "DB"
+	LogTypeRedis   LogType = "Redis"
 	LogTypeRequest LogType = "Request"
 	LogTypeMock    LogType = "Mock"
 	LogTypeApp     LogType = "App"

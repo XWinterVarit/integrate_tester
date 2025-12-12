@@ -4,6 +4,8 @@ go 1.25
 
 require (
 	fyne.io/fyne/v2 v2.7.1
+	github.com/alicebob/miniredis/v2 v2.34.0
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/sijms/go-ora/v2 v2.9.0
 )
