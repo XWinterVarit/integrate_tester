@@ -285,8 +285,29 @@ Key concepts:
 - `(*DBClient) ReplaceData(table string, values []interface{})` — insert or replace rows.
 - `(*DBClient) Update(table string, set map[string]interface{}, where string, args ...interface{})` — update rows.
 - `(*DBClient) CleanTable(table string)` — delete all rows.
+- `(*DBClient) DeleteOne(table, where string, args ...interface{})` — delete a single matching row (safety requires WHERE).
+- `(*DBClient) DeleteWithLimit(table, where string, limit int, args ...interface{})` — delete up to `limit` matching rows (limit<=0 deletes all matches, still requires WHERE). Handles Oracle/Postgres/SQLite differences internally.
 - `(*DBClient) DropTable(table string)` — drop the table.
 - `(*DBClient) Fetch(query string, args ...interface{}) QueryResult` — run a `SELECT` query.
+
+Redis helpers (`redis.go`):
+
+- `ConnectRedis(addr, password string, db int) *RedisClient`
+- `(*RedisClient) Set(key string, value interface{}, ttl time.Duration)`
+- `(*RedisClient) Get(key string) string`
+- `(*RedisClient) Del(keys ...string)`
+- `(*RedisClient) ExpectValue(key, expected string)`
+- `(*RedisClient) FlushAll()`
+
+Redis usage:
+
+```go
+rc := v1.ConnectRedis("localhost:6379", "", 0)
+rc.Set("foo", "bar", 0)
+rc.ExpectValue("foo", "bar")
+rc.Del("foo")
+rc.FlushAll()
+```
 
 Result wrappers:
 
@@ -311,6 +332,8 @@ row := result.GetRow(0)
 row.Expect("name", "Alice")
 
 db.CleanTable("users")
+db.DeleteOne("users", "id = ?", 1)
+db.DeleteWithLimit("users", "name = ?", 10, "Alice")
 db.DropTable("users")
 ```
 

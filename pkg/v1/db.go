@@ -145,6 +145,72 @@ func (c *DBClient) CleanTable(tableName string) {
 	}
 }
 
+// DeleteOne deletes a single row matching the where clause.
+// It is a convenience wrapper over DeleteWithLimit(..., 1).
+func (c *DBClient) DeleteOne(tableName string, where string, args ...interface{}) {
+	RecordAction(fmt.Sprintf("DB DeleteOne: %s", tableName), func() { c.DeleteOne(tableName, where, args...) })
+	if IsDryRun() {
+		return
+	}
+	c.deleteWithLimitInternal(tableName, where, 1, args...)
+}
+
+// DeleteWithLimit deletes up to `limit` rows matching the where clause.
+// If limit <= 0, it deletes all rows matching the condition.
+func (c *DBClient) DeleteWithLimit(tableName string, where string, limit int, args ...interface{}) {
+	RecordAction(fmt.Sprintf("DB DeleteWithLimit: %s", tableName), func() { c.DeleteWithLimit(tableName, where, limit, args...) })
+	if IsDryRun() {
+		return
+	}
+	c.deleteWithLimitInternal(tableName, where, limit, args...)
+}
+
+// deleteWithLimitInternal contains the shared delete logic.
+func (c *DBClient) deleteWithLimitInternal(tableName string, where string, limit int, args ...interface{}) {
+	if c.DB == nil {
+		Fail("DBClient is not connected")
+	}
+	if strings.TrimSpace(where) == "" {
+		Fail("Delete operation requires a WHERE clause to prevent full-table deletes")
+	}
+
+	finalWhere := where
+	argCounter := 1
+	if c.DriverName == "oracle" {
+		count := strings.Count(where, "?")
+		for i := 0; i < count; i++ {
+			finalWhere = strings.Replace(finalWhere, "?", fmt.Sprintf(":%d", argCounter), 1)
+			argCounter++
+		}
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s WHERE %s", tableName, finalWhere)
+	var allArgs []interface{}
+	allArgs = append(allArgs, args...)
+
+	if limit > 0 {
+		switch c.DriverName {
+		case "oracle":
+			query = fmt.Sprintf("DELETE FROM %s WHERE (%s) AND ROWNUM <= %d", tableName, finalWhere, limit)
+		case "postgres", "postgresql":
+			// Postgres has no DELETE ... LIMIT; use CTE
+			query = fmt.Sprintf("WITH cte AS (SELECT ctid FROM %s WHERE %s LIMIT %d) DELETE FROM %s WHERE ctid IN (SELECT ctid FROM cte)", tableName, finalWhere, limit, tableName)
+		case "sqlite3":
+			// Some SQLite builds don't accept DELETE ... LIMIT; use rowid subquery
+			query = fmt.Sprintf("DELETE FROM %s WHERE rowid IN (SELECT rowid FROM %s WHERE %s LIMIT %d)", tableName, tableName, finalWhere, limit)
+		default:
+			// MySQL/SQLite support LIMIT in DELETE
+			query = fmt.Sprintf("DELETE FROM %s WHERE %s LIMIT %d", tableName, finalWhere, limit)
+		}
+	}
+
+	Log(LogTypeDB, "Delete Rows", fmt.Sprintf("Query: %s\nArgs: %v", query, allArgs))
+	_, err := c.DB.Exec(query, allArgs...)
+	if err != nil {
+		Fail("Failed to delete from %s: %v", tableName, err)
+	}
+}
+
 // SetupTableFromAnother copies structure and data (simplified).
 // Note: This is complex across different DBs. We'll do a simple CREATE TABLE AS SELECT or similar if supported,
 // or just copy structure.
