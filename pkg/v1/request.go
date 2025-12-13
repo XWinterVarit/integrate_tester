@@ -58,7 +58,27 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	}
 
-	Logf(LogTypeRequest, "Sending %s request to: %s", cfg.method, url)
+	requestBody := string(cfg.body)
+	requestPrettyBody := requestBody
+	if len(cfg.body) > 0 {
+		var jsonObj interface{}
+		if json.Unmarshal(cfg.body, &jsonObj) == nil {
+			if pretty, err := json.MarshalIndent(jsonObj, "", "  "); err == nil {
+				requestPrettyBody = string(pretty)
+			}
+		}
+	}
+
+	reqHeaderLines := make([]string, 0, len(cfg.headers))
+	for k, v := range cfg.headers {
+		if v == "" {
+			reqHeaderLines = append(reqHeaderLines, fmt.Sprintf("%s:", k))
+			continue
+		}
+		reqHeaderLines = append(reqHeaderLines, fmt.Sprintf("%s: %s", k, v))
+	}
+
+	Log(LogTypeRequest, fmt.Sprintf("Sending %s request to: %s", cfg.method, url), fmt.Sprintf("Body:\n%s\nHeaders:\n%s", requestPrettyBody, strings.Join(reqHeaderLines, "\n")))
 	resp, err := client.Do(req)
 	if err != nil {
 		Fail("Request failed: %v", err)
@@ -67,6 +87,16 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 
 	respBody, _ := io.ReadAll(resp.Body)
 
+	prettyBody := string(respBody)
+	if len(respBody) > 0 {
+		var jsonObj interface{}
+		if json.Unmarshal(respBody, &jsonObj) == nil {
+			if pretty, err := json.MarshalIndent(jsonObj, "", "  "); err == nil {
+				prettyBody = string(pretty)
+			}
+		}
+	}
+
 	header := make(map[string]string)
 	for k, v := range resp.Header {
 		if len(v) > 0 {
@@ -74,7 +104,18 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 		}
 	}
 
-	Log(LogTypeRequest, fmt.Sprintf("Received status %d from %s", resp.StatusCode, url), fmt.Sprintf("Body: %s\nHeaders: %v", string(respBody), header))
+	headerLines := make([]string, 0, len(resp.Header))
+	for k, v := range resp.Header {
+		if len(v) == 0 {
+			headerLines = append(headerLines, fmt.Sprintf("%s:", k))
+			continue
+		}
+		for _, vv := range v {
+			headerLines = append(headerLines, fmt.Sprintf("%s: %s", k, vv))
+		}
+	}
+
+	Log(LogTypeRequest, fmt.Sprintf("Received status %d from %s", resp.StatusCode, url), fmt.Sprintf("Body:\n%s\nHeaders:\n%s", prettyBody, strings.Join(headerLines, "\n")))
 	return Response{
 		StatusCode: resp.StatusCode,
 		Body:       string(respBody),
