@@ -292,6 +292,32 @@ func ExpectJsonBodyField(resp Response, field string, expectedValue interface{})
 	Logf(LogTypeExpect, "JSON Field '%s' == %v - PASSED", field, expectedValue)
 }
 
+// ExpectJsonBodyFieldCond asserts that a specific field in the JSON response body
+// satisfies the provided condition against the expected value.
+// Supported conditions are the same as dynamic mock server conditions (e.g., Equal, NotEqual, GreaterThan).
+// It also supports checking for JSON null by passing expectedValue as nil with ConditionEqual/ConditionNotEqual.
+func ExpectJsonBodyFieldCond(resp Response, field string, condition string, expectedValue interface{}) {
+	if IsDryRun() {
+		return
+	}
+
+	var body interface{}
+	if err := json.Unmarshal([]byte(resp.Body), &body); err != nil {
+		Fail("ExpectJsonBodyFieldCond failed: response body is not valid JSON: %v. Body: %s", err, resp.Body)
+	}
+
+	gotValue, err := getValueByPath(body, field)
+	if err != nil {
+		Fail("ExpectJsonBodyFieldCond failed to get field '%s': %v. Body: %s", field, err, resp.Body)
+	}
+
+	if !evaluateCondition(gotValue, condition, expectedValue) {
+		Fail("ExpectJsonBodyFieldCond failed for field '%s' with condition '%s':\nExpected: %v (%T)\nGot:      %v (%T)", field, condition, expectedValue, expectedValue, gotValue, gotValue)
+	}
+
+	Logf(LogTypeExpect, "JSON Field '%s' %s %v - PASSED", field, condition, expectedValue)
+}
+
 func getValueByPath(data interface{}, path string) (interface{}, error) {
 	parts := strings.Split(path, ".")
 	current := data

@@ -75,3 +75,51 @@ func TestDBClient(t *testing.T) {
 	}()
 	db.Fetch("SELECT * FROM users")
 }
+
+func TestRowResultExpectCond(t *testing.T) {
+	// Use in-memory sqlite
+	db := Connect("sqlite3", ":memory:")
+
+	fields := []Field{
+		{"id", "INTEGER PRIMARY KEY AUTOINCREMENT"},
+		{"name", "TEXT"},
+		{"age", "INTEGER"},
+	}
+	db.SetupTable("users", true, fields, nil)
+
+	// Insert rows including NULLs
+	db.ReplaceData("users", []interface{}{1, "Alice", 30})
+	db.ReplaceData("users", []interface{}{2, nil, nil})
+
+	result := db.Fetch("SELECT name, age FROM users WHERE id = ?", 1)
+	row := result.GetRow(0)
+
+	// Success cases
+	row.ExpectCond("age", ConditionGreaterThan, 20)
+	row.ExpectCond("age", ConditionLessThanOrEqual, 30)
+	row.ExpectCond("name", ConditionContains, "lic")
+	row.ExpectCond("name", ConditionStartsWith, "Al")
+	row.ExpectCond("name", ConditionEndsWith, "ce")
+
+	// NULL handling
+	nullRow := db.Fetch("SELECT name, age FROM users WHERE id = ?", 2).GetRow(0)
+	nullRow.ExpectCond("name", ConditionEqual, nil)
+	nullRow.ExpectCond("age", ConditionEqual, nil)
+
+	// Failure cases (should panic)
+	assertPanic := func(name string, f func()) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("%s expected to panic", name)
+			} else {
+				if _, ok := r.(TestError); !ok {
+					t.Errorf("%s panicked with unexpected type: %T", name, r)
+				}
+			}
+		}()
+		f()
+	}
+
+	assertPanic("condition mismatch", func() { row.ExpectCond("age", ConditionLessThan, 10) })
+	assertPanic("missing field", func() { row.ExpectCond("missing", ConditionEqual, 1) })
+}

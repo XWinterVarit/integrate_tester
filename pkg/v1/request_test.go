@@ -65,6 +65,35 @@ func TestExpectFunctions(t *testing.T) {
 	assertPanic("ExpectJsonBodyField path", func() { ExpectJsonBodyField(resp, "x.y", 1) })
 }
 
+func TestExpectJsonBodyFieldCond(t *testing.T) {
+	resp := Response{
+		Body: `{"num": 5, "text": "hello world", "nullField": null, "nested": {"arr": [1, 2]}}`,
+	}
+
+	// Success cases
+	ExpectJsonBodyFieldCond(resp, "num", ConditionGreaterThan, 3)
+	ExpectJsonBodyFieldCond(resp, "num", ConditionLessThanOrEqual, 5)
+	ExpectJsonBodyFieldCond(resp, "text", ConditionContains, "hello")
+	ExpectJsonBodyFieldCond(resp, "text", ConditionStartsWith, "hello")
+	ExpectJsonBodyFieldCond(resp, "text", ConditionEndsWith, "world")
+	ExpectJsonBodyFieldCond(resp, "nested.arr[1]", ConditionEqual, 2)
+	ExpectJsonBodyFieldCond(resp, "nullField", ConditionEqual, nil)
+	ExpectJsonBodyFieldCond(resp, "nullField", ConditionNotEqual, "not-nil")
+
+	// Failure cases (should panic)
+	assertPanic := func(name string, f func()) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("%s expected to panic", name)
+			}
+		}()
+		f()
+	}
+
+	assertPanic("invalid path", func() { ExpectJsonBodyFieldCond(resp, "missing", ConditionEqual, 1) })
+	assertPanic("condition mismatch", func() { ExpectJsonBodyFieldCond(resp, "num", ConditionLessThan, 1) })
+}
+
 func TestSendRESTRequestWithMethodHeadersAndJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

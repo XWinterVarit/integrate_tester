@@ -479,3 +479,18 @@ func (r *RowResult) Expect(field string, expected interface{}) {
 	}
 	Logf(LogTypeExpect, "DB Field '%s' == '%v' - PASSED", field, expected)
 }
+
+// ExpectCond asserts that the field satisfies the provided condition against the expected value.
+// Supports nil (DB NULL) comparison when using ConditionEqual/ConditionNotEqual with expected == nil.
+func (r *RowResult) ExpectCond(field string, condition string, expected interface{}) {
+	if IsDryRun() {
+		return
+	}
+	val := r.Get(field)
+
+	if !evaluateCondition(val, condition, expected) {
+		Fail("ExpectCond failed for field '%s' with condition '%s': expected %v (%T), got %v (%T)", field, condition, expected, expected, val, val)
+	}
+
+	Logf(LogTypeExpect, "DB Field '%s' %s %v - PASSED", field, condition, expected)
+}
