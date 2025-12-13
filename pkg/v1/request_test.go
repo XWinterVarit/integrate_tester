@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -62,4 +63,55 @@ func TestExpectFunctions(t *testing.T) {
 	assertPanic("ExpectJsonBody", func() { ExpectJsonBody(resp, `{"a": 2}`) })
 	assertPanic("ExpectJsonBodyField", func() { ExpectJsonBodyField(resp, "a", 999) })
 	assertPanic("ExpectJsonBodyField path", func() { ExpectJsonBodyField(resp, "x.y", 1) })
+}
+
+func TestSendRESTRequestWithMethodHeadersAndJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected method POST, got %s", r.Method)
+		}
+		if r.Header.Get("X-Test") != "Value" {
+			t.Errorf("expected header X-Test=Value, got %s", r.Header.Get("X-Test"))
+		}
+		body, _ := io.ReadAll(r.Body)
+		if string(body) != `{"a":1}` {
+			t.Errorf("expected body {\"a\":1}, got %s", string(body))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer server.Close()
+
+	resp := SendRESTRequest(server.URL,
+		WithMethod(http.MethodPost),
+		WithHeader("X-Test", "Value"),
+		WithJSONBody(map[string]int{"a": 1}),
+	)
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+	}
+	if resp.Body != `{"ok":true}` {
+		t.Fatalf("expected body '{\"ok\":true}', got %s", resp.Body)
+	}
+	if resp.Header["Content-Type"] != "application/json" {
+		t.Fatalf("expected content-type application/json, got %s", resp.Header["Content-Type"])
+	}
+}
+
+func TestSendRESTRequestIgnoreSSL(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "secure")
+	}))
+	defer server.Close()
+
+	resp := SendRESTRequest(server.URL, WithIgnoreServerSSL(true))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	if resp.Body != "secure" {
+		t.Fatalf("expected body 'secure', got %s", resp.Body)
+	}
 }

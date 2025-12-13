@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,26 +12,60 @@ import (
 	"strings"
 )
 
-// SendRequest sends a HTTP GET request to the specified URL.
-// We use a different name than "Request" because "Request" is already a type.
-func SendRequest(url string) Response {
-	RecordAction(fmt.Sprintf("Request: %s", url), func() { SendRequest(url) })
+// SendRESTRequest sends an HTTP request with flexible options.
+// Common usage:
+//
+//	SendRESTRequest(url,
+//	    WithMethod("POST"),
+//	    WithHeader("Authorization", "Bearer ..."),
+//	    WithJSONBody(map[string]interface{}{...}),
+//	    WithIgnoreServerSSL(true),
+//	)
+func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
+	cfg := restRequestConfig{
+		method:  http.MethodGet,
+		headers: make(map[string]string),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+
+	RecordAction(fmt.Sprintf("Request: %s %s", cfg.method, url), func() {
+		SendRESTRequest(url, opts...)
+	})
 	if IsDryRun() {
 		return Response{}
 	}
-	Logf(LogTypeRequest, "Sending GET request to: %s", url)
-	resp, err := http.Get(url)
+
+	var bodyReader io.Reader
+	if len(cfg.body) > 0 {
+		bodyReader = bytes.NewReader(cfg.body)
+	}
+
+	req, err := http.NewRequest(cfg.method, url, bodyReader)
 	if err != nil {
-		// In integration tests, we often panic on setup failure, but here it's part of the test.
-		// Returning a 0 status response might be confusing.
-		// Let's panic to show the test failed immediately?
-		// Or return error? The example: resp := Request(...); Expect...
-		// If Request fails, Expect will likely fail or panic.
+		Fail("Request build failed: %v", err)
+	}
+
+	for k, v := range cfg.headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{}
+	if cfg.ignoreServerSSL {
+		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	}
+
+	Logf(LogTypeRequest, "Sending %s request to: %s", cfg.method, url)
+	resp, err := client.Do(req)
+	if err != nil {
 		Fail("Request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	respBody, _ := io.ReadAll(resp.Body)
 
 	header := make(map[string]string)
 	for k, v := range resp.Header {
@@ -38,11 +74,96 @@ func SendRequest(url string) Response {
 		}
 	}
 
-	Log(LogTypeRequest, fmt.Sprintf("Received status %d from %s", resp.StatusCode, url), fmt.Sprintf("Body: %s\nHeaders: %v", string(body), header))
+	Log(LogTypeRequest, fmt.Sprintf("Received status %d from %s", resp.StatusCode, url), fmt.Sprintf("Body: %s\nHeaders: %v", string(respBody), header))
 	return Response{
 		StatusCode: resp.StatusCode,
-		Body:       string(body),
+		Body:       string(respBody),
 		Header:     header,
+	}
+}
+
+// SendRequest keeps backward compatibility; it is equivalent to GET via SendRESTRequest.
+func SendRequest(url string) Response {
+	return SendRESTRequest(url)
+}
+
+// RESTRequestOption configures SendRESTRequest.
+type RESTRequestOption func(*restRequestConfig)
+
+type restRequestConfig struct {
+	method          string
+	headers         map[string]string
+	body            []byte
+	ignoreServerSSL bool
+}
+
+// WithMethod sets HTTP method (GET by default).
+func WithMethod(method string) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		if method != "" {
+			c.method = method
+		}
+	}
+}
+
+// WithHeader adds a single header.
+func WithHeader(key, value string) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		if c.headers == nil {
+			c.headers = make(map[string]string)
+		}
+		c.headers[key] = value
+	}
+}
+
+// WithHeaders merges multiple headers.
+func WithHeaders(headers map[string]string) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		if c.headers == nil {
+			c.headers = make(map[string]string)
+		}
+		for k, v := range headers {
+			c.headers[k] = v
+		}
+	}
+}
+
+// WithJSONBody marshals the given value as JSON and sets it as body.
+// It also sets Content-Type to application/json if not already provided.
+func WithJSONBody(v interface{}) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		if v == nil {
+			return
+		}
+		data, err := json.Marshal(v)
+		if err != nil {
+			Fail("Failed to marshal JSON body: %v", err)
+		}
+		c.body = data
+		if _, ok := c.headers["Content-Type"]; !ok {
+			c.headers["Content-Type"] = "application/json"
+		}
+	}
+}
+
+// WithBody sets raw bytes as body (caller can set headers accordingly).
+func WithBody(body []byte) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		c.body = body
+	}
+}
+
+// WithBodyString sets body from string.
+func WithBodyString(body string) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		c.body = []byte(body)
+	}
+}
+
+// WithIgnoreServerSSL skips server certificate verification (useful for tests/self-signed certs).
+func WithIgnoreServerSSL(ignore bool) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		c.ignoreServerSSL = ignore
 	}
 }
 

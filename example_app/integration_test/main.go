@@ -3,8 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	v1 "github.com/XWinterVarit/integrate_tester/pkg/v1"
 
@@ -24,13 +28,16 @@ func main() {
 	var db *v1.DBClient
 
 	t.Stage("Setup", func() {
-		appPath := "../../example_app_bin"
-		if _, err := os.Stat(appPath); os.IsNotExist(err) {
-			if _, err := os.Stat("example_app_bin"); err == nil {
-				appPath = "./example_app_bin"
-			} else {
-				v1.Fail("Application binary 'example_app_bin' not found. Please build it: go build -o example_app_bin example_app/main.go")
-			}
+		// Build the example app binary to ensure the latest routes (e.g., /update-json) are available
+		workDir, err := os.Getwd()
+		v1.AssertNoError(err)
+		appPath := filepath.Join(workDir, "example_app_bin")
+
+		buildCmd := exec.Command("go", "build", "-o", appPath, "example_app/main.go")
+		buildCmd.Stdout = os.Stdout
+		buildCmd.Stderr = os.Stderr
+		if err := buildCmd.Run(); err != nil {
+			v1.Fail("Failed to build example app: %v", err)
 		}
 
 		// 1. Connect to Oracle
@@ -70,6 +77,35 @@ func main() {
 		// 3. Read via App (Should succeed now)
 		resp = v1.SendRequest("http://localhost:8080/read?id=1")
 		v1.ExpectJsonBody(resp, `{"id": "1", "status": "updated"}`)
+	})
+
+	t.Stage("Complex Request (POST JSON)", func() {
+		requestID := fmt.Sprintf("req-%d", time.Now().UnixNano())
+		newStatus := "json-updated"
+
+		resp := v1.SendRESTRequest("http://localhost:8080/update-json",
+			v1.WithMethod(http.MethodPost),
+			v1.WithHeader("X-Request-ID", requestID),
+			v1.WithHeaders(map[string]string{"X-Trace": "integration-example"}),
+			v1.WithJSONBody(map[string]interface{}{
+				"id":     "1",
+				"status": newStatus,
+				"meta": map[string]interface{}{
+					"requested_at": time.Now().Format(time.RFC3339),
+				},
+			}),
+		)
+
+		v1.ExpectStatusCode(resp, 200)
+		v1.ExpectHeader(resp, "Content-Type", "application/json")
+		v1.ExpectJsonBodyField(resp, "id", "1")
+		v1.ExpectJsonBodyField(resp, "status", newStatus)
+		v1.ExpectJsonBodyField(resp, "request_id", requestID)
+
+		// Verify DB updated from POST JSON call
+		result := db.Fetch("SELECT status FROM users WHERE id = ?", 1)
+		result.ExpectCount(1)
+		result.GetRow(0).Expect("status", newStatus)
 	})
 
 	t.Stage("Fail Case", func() {

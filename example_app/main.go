@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -81,6 +82,62 @@ func main() {
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"result": "ok"}`))
+	})
+
+	// API: Update Data via JSON body and custom header (POST)
+	// POST /update-json
+	// Header: X-Request-ID required
+	// Body: {"id": "1", "status": "updated"}
+	http.HandleFunc("/update-json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		reqID := r.Header.Get("X-Request-ID")
+		if reqID == "" {
+			http.Error(w, "missing X-Request-ID", http.StatusBadRequest)
+			return
+		}
+
+		var payload struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		}
+
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&payload); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+
+		if payload.ID == "" || payload.Status == "" {
+			http.Error(w, "missing id or status", http.StatusBadRequest)
+			return
+		}
+
+		var query string
+		if *driver == "sqlite3" {
+			query = "UPDATE users SET status = ? WHERE id = ?"
+		} else {
+			query = "UPDATE users SET status = :1 WHERE id = :2"
+		}
+
+		_, err := db.Exec(query, payload.Status, payload.ID)
+		if err != nil {
+			log.Printf("Update-json error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		respBody, _ := json.Marshal(map[string]string{
+			"id":         payload.ID,
+			"status":     payload.Status,
+			"request_id": reqID,
+		})
+		w.WriteHeader(http.StatusOK)
+		w.Write(respBody)
 	})
 
 	// API: Read Data
