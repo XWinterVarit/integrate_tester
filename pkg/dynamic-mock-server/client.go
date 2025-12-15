@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"crypto/tls"
+	"strings"
 )
 
 type Client struct {
@@ -14,9 +17,14 @@ type Client struct {
 }
 
 func NewClient(baseURL string) *Client {
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	if strings.HasPrefix(strings.ToLower(baseURL), "https://") {
+		httpClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	}
+
 	return &Client{
 		BaseURL: baseURL,
-		Client:  &http.Client{Timeout: 10 * time.Second},
+		Client:  httpClient,
 	}
 }
 

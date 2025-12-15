@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	dm "github.com/XWinterVarit/integrate_tester/pkg/dynamic-mock-server"
@@ -34,5 +36,23 @@ func TestDynamicMockAliases(t *testing.T) {
 	client := NewDynamicMockClient("http://localhost:8888")
 	if client.BaseURL != "http://localhost:8888" {
 		t.Errorf("Client BaseURL incorrect")
+	}
+}
+
+func TestDynamicMockClient_HTTPSInsecureSkipVerify(t *testing.T) {
+	// HTTPS server with self-signed certificate
+	mockServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/resetAll" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	client := NewDynamicMockClient(mockServer.URL)
+
+	if err := client.ResetAll(); err != nil {
+		t.Fatalf("ResetAll over HTTPS failed: %v", err)
 	}
 }

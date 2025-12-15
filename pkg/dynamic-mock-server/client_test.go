@@ -312,3 +312,21 @@ func TestClient_Methods(t *testing.T) {
 		}
 	})
 }
+
+func TestClient_HTTPSInsecureSkipVerify(t *testing.T) {
+	// HTTPS server with self-signed certificate
+	mockServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/resetAll" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	client := NewClient(mockServer.URL)
+
+	if err := client.ResetAll(); err != nil {
+		t.Fatalf("ResetAll over HTTPS failed: %v", err)
+	}
+}
