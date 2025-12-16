@@ -123,3 +123,40 @@ func TestRowResultExpectCond(t *testing.T) {
 	assertPanic("condition mismatch", func() { row.ExpectCond("age", ConditionLessThan, 10) })
 	assertPanic("missing field", func() { row.ExpectCond("missing", ConditionEqual, 1) })
 }
+
+func TestInsertOne(t *testing.T) {
+	// Use in-memory sqlite
+	db := Connect("sqlite3", ":memory:")
+
+	fields := []Field{
+		{"id", "INTEGER PRIMARY KEY AUTOINCREMENT"},
+		{"name", "TEXT"},
+		{"age", "INTEGER"},
+	}
+	db.SetupTable("users", true, fields, nil)
+
+	// happy path
+	db.InsertOne("users", []interface{}{"name", "Alice", "age", 30})
+	result := db.Fetch("SELECT name, age FROM users")
+	result.ExpectCount(1)
+	row := result.GetRow(0)
+	row.Expect("name", "Alice")
+	row.Expect("age", int64(30))
+
+	// invalid arg length (should panic)
+	assertPanic := func(name string, f func()) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("%s expected to panic", name)
+			} else {
+				if _, ok := r.(TestError); !ok {
+					t.Errorf("%s panicked with unexpected type: %T", name, r)
+				}
+			}
+		}()
+		f()
+	}
+
+	assertPanic("odd length", func() { db.InsertOne("users", []interface{}{"name", "Bob", "age"}) })
+	assertPanic("bad field name", func() { db.InsertOne("users", []interface{}{123, "Bob"}) })
+}

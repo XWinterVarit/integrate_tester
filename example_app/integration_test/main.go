@@ -54,8 +54,8 @@ func main() {
 			{"status", "VARCHAR2(50)"},
 		}, nil)
 
-		// 2. Insert Initial Data
-		db.ReplaceData("users", []interface{}{1, "alice", "active"})
+		// 2. Insert Initial Data using InsertOne (new helper for column/value pairs)
+		db.InsertOne("users", []interface{}{"id", 1, "name", "alice", "status", "active"})
 
 		// 3. Run App
 		app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn, "-mock-service", fmt.Sprintf("http://localhost:%d", mockPort))

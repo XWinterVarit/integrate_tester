@@ -225,6 +225,50 @@ func SetupTableFromAnother(destClient *DBClient, destTable string, srcClient *DB
 	Log(LogTypeDB, "SetupTableFromAnother Warning", "SetupTableFromAnother is a placeholder. Implementing full table copy across connections is complex generic logic.")
 }
 
+// InsertOne inserts a single row with specified column-value pairs.
+// fieldsAndValues should be an even-length list: ["col1", val1, "col2", val2, ...].
+func (c *DBClient) InsertOne(tableName string, fieldsAndValues []interface{}) {
+	RecordAction(fmt.Sprintf("DB InsertOne: %s", tableName), func() { c.InsertOne(tableName, fieldsAndValues) })
+	if IsDryRun() {
+		return
+	}
+	if c.DB == nil {
+		Fail("DBClient is not connected")
+	}
+	if len(fieldsAndValues) == 0 || len(fieldsAndValues)%2 != 0 {
+		Fail("InsertOne requires an even number of field and value pairs")
+	}
+
+	var cols []string
+	var placeholders []string
+	var values []interface{}
+	argCounter := 1
+
+	for i := 0; i < len(fieldsAndValues); i += 2 {
+		colName, ok := fieldsAndValues[i].(string)
+		if !ok || strings.TrimSpace(colName) == "" {
+			Fail("InsertOne expects field names as non-empty strings (got %v)", fieldsAndValues[i])
+		}
+		cols = append(cols, colName)
+
+		ph := "?"
+		if c.DriverName == "oracle" {
+			ph = fmt.Sprintf(":%d", argCounter)
+			argCounter++
+		}
+		placeholders = append(placeholders, ph)
+		values = append(values, fieldsAndValues[i+1])
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+	Log(LogTypeDB, "Insert One", fmt.Sprintf("Query: %s\nArgs: %v", query, values))
+
+	_, err := c.DB.Exec(query, values...)
+	if err != nil {
+		Fail("Failed to insert into %s: %v", tableName, err)
+	}
+}
+
 // ReplaceData inserts or replaces data.
 // Data is assumed to be a list of values matching columns order.
 func (c *DBClient) ReplaceData(tableName string, values []interface{}) {
