@@ -54,7 +54,14 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 	}
 
 	client := &http.Client{}
-	if cfg.ignoreServerSSL {
+	ignoreSSL := false
+	if cfg.ignoreServerSSL != nil {
+		ignoreSSL = *cfg.ignoreServerSSL
+	} else if strings.HasPrefix(strings.ToLower(url), "https://") {
+		ignoreSSL = true
+	}
+
+	if ignoreSSL {
 		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	}
 
@@ -135,7 +142,7 @@ type restRequestConfig struct {
 	method          string
 	headers         map[string]string
 	body            []byte
-	ignoreServerSSL bool
+	ignoreServerSSL *bool
 }
 
 // WithMethod sets HTTP method (GET by default).
@@ -204,7 +211,7 @@ func WithBodyString(body string) RESTRequestOption {
 // WithIgnoreServerSSL skips server certificate verification (useful for tests/self-signed certs).
 func WithIgnoreServerSSL(ignore bool) RESTRequestOption {
 	return func(c *restRequestConfig) {
-		c.ignoreServerSSL = ignore
+		c.ignoreServerSSL = &ignore
 	}
 }
 
