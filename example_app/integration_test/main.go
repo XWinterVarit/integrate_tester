@@ -54,11 +54,15 @@ func main() {
 			{"status", "VARCHAR2(50)"},
 		}, nil)
 
-		// 2. Insert Initial Data using InsertOne (new helper for column/value pairs)
-		db.InsertOne("users", []interface{}{"id", 1, "name", "alice", "status", "active"})
-
-		// 3. Run App
+		// 2. Run App
 		app = v1.RunAppServer(appPath, "-driver", "oracle", "-dsn", dsn, "-mock-service", fmt.Sprintf("http://localhost:%d", mockPort))
+
+		// 3. Insert Initial Data using the app /insert endpoint (new key/value struct style)
+		resp := v1.SendRESTRequest("http://localhost:8080/insert?id=1&name=alice&status=active",
+			v1.WithMethod(http.MethodPost),
+		)
+		v1.ExpectStatusCode(resp, http.StatusCreated)
+		v1.ExpectJsonBody(resp, `{"result": "inserted"}`)
 	})
 
 	t.Stage("Success Case", func() {

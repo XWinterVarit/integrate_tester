@@ -9,6 +9,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
+
+	v1 "github.com/XWinterVarit/integrate_tester/pkg/v1"
 
 	_ "github.com/mattn/go-sqlite3"
 	_ "github.com/sijms/go-ora/v2"
@@ -19,6 +22,34 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func insertOne(db *sql.DB, driverName, table string, fields []v1.InsertField) error {
+	if len(fields) == 0 {
+		return fmt.Errorf("no fields provided")
+	}
+
+	var cols []string
+	var placeholders []string
+	var values []interface{}
+
+	for i, f := range fields {
+		if strings.TrimSpace(f.Key) == "" {
+			return fmt.Errorf("field name cannot be empty")
+		}
+		cols = append(cols, f.Key)
+
+		ph := "?"
+		if driverName == "oracle" {
+			ph = fmt.Sprintf(":%d", i+1)
+		}
+		placeholders = append(placeholders, ph)
+		values = append(values, f.Value)
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+	_, err := db.Exec(query, values...)
+	return err
 }
 
 func main() {
@@ -57,6 +88,39 @@ func main() {
 
 	// API: Update Data
 	// GET /update?id=1&status=new_status
+	http.HandleFunc("/insert", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		id := r.URL.Query().Get("id")
+		name := r.URL.Query().Get("name")
+		status := r.URL.Query().Get("status")
+
+		if name == "" || status == "" {
+			http.Error(w, "Missing name or status", http.StatusBadRequest)
+			return
+		}
+
+		fields := []v1.InsertField{
+			{Key: "name", Value: name},
+			{Key: "status", Value: status},
+		}
+		if id != "" {
+			fields = append([]v1.InsertField{{Key: "id", Value: id}}, fields...)
+		}
+
+		if err := insertOne(db, *driver, "users", fields); err != nil {
+			log.Printf("Insert error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"result": "inserted"}`))
+	})
+
 	http.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
 		status := r.URL.Query().Get("status")

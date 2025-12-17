@@ -17,6 +17,12 @@ type Index struct {
 	Columns []string
 }
 
+// InsertField represents a column-value pair for inserts.
+type InsertField struct {
+	Key   string
+	Value interface{}
+}
+
 // DBClient wraps the sql.DB connection.
 type DBClient struct {
 	DB         *sql.DB
@@ -226,17 +232,17 @@ func SetupTableFromAnother(destClient *DBClient, destTable string, srcClient *DB
 }
 
 // InsertOne inserts a single row with specified column-value pairs.
-// fieldsAndValues should be an even-length list: ["col1", val1, "col2", val2, ...].
-func (c *DBClient) InsertOne(tableName string, fieldsAndValues []interface{}) {
-	RecordAction(fmt.Sprintf("DB InsertOne: %s", tableName), func() { c.InsertOne(tableName, fieldsAndValues) })
+// fields should be a list of InsertField: [{Key: "col1", Value: val1}, ...].
+func (c *DBClient) InsertOne(tableName string, fields []InsertField) {
+	RecordAction(fmt.Sprintf("DB InsertOne: %s", tableName), func() { c.InsertOne(tableName, fields) })
 	if IsDryRun() {
 		return
 	}
 	if c.DB == nil {
 		Fail("DBClient is not connected")
 	}
-	if len(fieldsAndValues) == 0 || len(fieldsAndValues)%2 != 0 {
-		Fail("InsertOne requires an even number of field and value pairs")
+	if len(fields) == 0 {
+		Fail("InsertOne requires at least one field/value pair")
 	}
 
 	var cols []string
@@ -244,12 +250,11 @@ func (c *DBClient) InsertOne(tableName string, fieldsAndValues []interface{}) {
 	var values []interface{}
 	argCounter := 1
 
-	for i := 0; i < len(fieldsAndValues); i += 2 {
-		colName, ok := fieldsAndValues[i].(string)
-		if !ok || strings.TrimSpace(colName) == "" {
-			Fail("InsertOne expects field names as non-empty strings (got %v)", fieldsAndValues[i])
+	for _, f := range fields {
+		if strings.TrimSpace(f.Key) == "" {
+			Fail("InsertOne expects field names as non-empty strings (got %v)", f.Key)
 		}
-		cols = append(cols, colName)
+		cols = append(cols, f.Key)
 
 		ph := "?"
 		if c.DriverName == "oracle" {
@@ -257,7 +262,7 @@ func (c *DBClient) InsertOne(tableName string, fieldsAndValues []interface{}) {
 			argCounter++
 		}
 		placeholders = append(placeholders, ph)
-		values = append(values, fieldsAndValues[i+1])
+		values = append(values, f.Value)
 	}
 
 	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, strings.Join(cols, ", "), strings.Join(placeholders, ", "))

@@ -136,7 +136,7 @@ func TestInsertOne(t *testing.T) {
 	db.SetupTable("users", true, fields, nil)
 
 	// happy path
-	db.InsertOne("users", []interface{}{"name", "Alice", "age", 30})
+	db.InsertOne("users", []InsertField{{Key: "name", Value: "Alice"}, {Key: "age", Value: 30}})
 	result := db.Fetch("SELECT name, age FROM users")
 	result.ExpectCount(1)
 	row := result.GetRow(0)
@@ -157,6 +157,6 @@ func TestInsertOne(t *testing.T) {
 		f()
 	}
 
-	assertPanic("odd length", func() { db.InsertOne("users", []interface{}{"name", "Bob", "age"}) })
-	assertPanic("bad field name", func() { db.InsertOne("users", []interface{}{123, "Bob"}) })
+	assertPanic("no fields", func() { db.InsertOne("users", []InsertField{}) })
+	assertPanic("bad field name", func() { db.InsertOne("users", []InsertField{{Key: "", Value: "Bob"}}) })
 }
