@@ -136,7 +136,10 @@ func TestInsertOne(t *testing.T) {
 	db.SetupTable("users", true, fields, nil)
 
 	// happy path
-	db.InsertOne("users", []InsertField{{Key: "name", Value: "Alice"}, {Key: "age", Value: 30}})
+	db.InsertOne("users", []InsertField{
+		{"name", "Alice"},
+		{"age", 30},
+	})
 	result := db.Fetch("SELECT name, age FROM users")
 	result.ExpectCount(1)
 	row := result.GetRow(0)
