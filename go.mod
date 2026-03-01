@@ -1,6 +1,6 @@
 module github.com/XWinterVarit/integrate_tester
 
-go 1.25
+go 1.23
 
 require (
 	fyne.io/fyne/v2 v2.7.1
