@@ -90,6 +90,60 @@ func (c *RedisClient) ExpectValue(key string, expected string) {
 	Logf(LogTypeExpect, "Redis key %s == %s - PASSED", key, expected)
 }
 
+// HSet sets a field in a hash.
+func (c *RedisClient) HSet(key, field string, value interface{}) {
+	RecordAction(fmt.Sprintf("Redis HSet: %s %s", key, field), func() { c.HSet(key, field, value) })
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	Log(LogTypeRedis, fmt.Sprintf("HSET %s %s", key, field), fmt.Sprintf("value=%v", value))
+	if err := c.client.HSet(context.Background(), key, field, value).Err(); err != nil {
+		Fail("Failed to hset redis key %s field %s: %v", key, field, err)
+	}
+}
+
+// HGet retrieves a field value from a hash.
+func (c *RedisClient) HGet(key, field string) string {
+	RecordAction(fmt.Sprintf("Redis HGet: %s %s", key, field), func() { c.HGet(key, field) })
+	if IsDryRun() {
+		return ""
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	Logf(LogTypeRedis, "HGET %s %s", key, field)
+	val, err := c.client.HGet(context.Background(), key, field).Result()
+	if err != nil {
+		if err == redis.Nil {
+			Fail("Redis hash key %s field %s not found", key, field)
+		}
+		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
+	}
+	return val
+}
+
+// HIncrement increments a hash field by the given integer amount.
+func (c *RedisClient) HIncrement(key, field string, increment int64) int64 {
+	RecordAction(fmt.Sprintf("Redis HIncrement: %s %s by %d", key, field, increment), func() {
+		c.HIncrement(key, field, increment)
+	})
+	if IsDryRun() {
+		return 0
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	Logf(LogTypeRedis, "HINCRBY %s %s %d", key, field, increment)
+	val, err := c.client.HIncrBy(context.Background(), key, field, increment).Result()
+	if err != nil {
+		Fail("Failed to hincrby redis key %s field %s: %v", key, field, err)
+	}
+	return val
+}
+
 // FlushAll removes all keys from the current database.
 func (c *RedisClient) FlushAll() {
 	RecordAction("Redis FlushAll", func() { c.FlushAll() })

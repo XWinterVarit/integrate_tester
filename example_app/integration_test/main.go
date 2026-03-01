@@ -123,6 +123,38 @@ func main() {
 		v1.ExpectStatusCode(resp, 500)
 	})
 
+	t.Stage("Redis Hash Operations", func() {
+		redisAddr := "localhost:6379"
+		if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+			redisAddr = addr
+		}
+		redis := v1.ConnectRedis(redisAddr, "", 0)
+
+		// HSet: store user profile fields in a hash
+		redis.HSet("profile:1", "name", "Alice")
+		redis.HSet("profile:1", "email", "alice@example.com")
+
+		// HGet: verify stored fields
+		name := redis.HGet("profile:1", "name")
+		if name != "Alice" {
+			v1.Fail("Expected profile:1 name=Alice, got %s", name)
+		}
+		email := redis.HGet("profile:1", "email")
+		if email != "alice@example.com" {
+			v1.Fail("Expected profile:1 email=alice@example.com, got %s", email)
+		}
+
+		// HIncrement: track page view counter in a hash
+		redis.HSet("stats:page", "views", "100")
+		newViews := redis.HIncrement("stats:page", "views", 10)
+		if newViews != 110 {
+			v1.Fail("Expected stats:page views=110, got %d", newViews)
+		}
+
+		// Cleanup
+		redis.Del("profile:1", "stats:page")
+	})
+
 	t.Stage("Cleanup", func() {
 		if app != nil {
 			app.Stop()
