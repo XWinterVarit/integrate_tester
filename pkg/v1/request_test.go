@@ -1,12 +1,248 @@
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func TestSetValueByPath(t *testing.T) {
+	// Helper to build a JSON-decoded structure from a JSON string
+	makeData := func(raw string) interface{} {
+		var d interface{}
+		if err := json.Unmarshal([]byte(raw), &d); err != nil {
+			t.Fatalf("makeData: %v", err)
+		}
+		return d
+	}
+
+	t.Run("set top-level string field", func(t *testing.T) {
+		data := makeData(`{"name":"alice"}`)
+		if err := setValueByPath(data, "name", "bob"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["name"]
+		if got != "bob" {
+			t.Fatalf("expected bob, got %v", got)
+		}
+	})
+
+	t.Run("set top-level numeric field", func(t *testing.T) {
+		data := makeData(`{"score":10}`)
+		if err := setValueByPath(data, "score", float64(99)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["score"]
+		if got != float64(99) {
+			t.Fatalf("expected 99, got %v", got)
+		}
+	})
+
+	t.Run("set top-level boolean field", func(t *testing.T) {
+		data := makeData(`{"active":false}`)
+		if err := setValueByPath(data, "active", true); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["active"]
+		if got != true {
+			t.Fatalf("expected true, got %v", got)
+		}
+	})
+
+	t.Run("set top-level null field to value", func(t *testing.T) {
+		data := makeData(`{"val":null}`)
+		if err := setValueByPath(data, "val", "hello"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["val"]
+		if got != "hello" {
+			t.Fatalf("expected hello, got %v", got)
+		}
+	})
+
+	t.Run("set nested two-level field", func(t *testing.T) {
+		data := makeData(`{"a":{"b":"old"}}`)
+		if err := setValueByPath(data, "a.b", "new"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["a"].(map[string]interface{})["b"]
+		if got != "new" {
+			t.Fatalf("expected new, got %v", got)
+		}
+	})
+
+	t.Run("set nested three-level field", func(t *testing.T) {
+		data := makeData(`{"x":{"y":{"z":"before"}}}`)
+		if err := setValueByPath(data, "x.y.z", "after"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["x"].(map[string]interface{})["y"].(map[string]interface{})["z"]
+		if got != "after" {
+			t.Fatalf("expected after, got %v", got)
+		}
+	})
+
+	t.Run("set array element by index", func(t *testing.T) {
+		data := makeData(`{"items":["a","b","c"]}`)
+		if err := setValueByPath(data, "items[1]", "B"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		arr := data.(map[string]interface{})["items"].([]interface{})
+		if arr[1] != "B" {
+			t.Fatalf("expected B, got %v", arr[1])
+		}
+	})
+
+	t.Run("set field inside array element (dot+bracket)", func(t *testing.T) {
+		data := makeData(`{"a":{"b":[{"c":"old"}]}}`)
+		if err := setValueByPath(data, "a.b[0].c", "something"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["a"].(map[string]interface{})["b"].([]interface{})[0].(map[string]interface{})["c"]
+		if got != "something" {
+			t.Fatalf("expected something, got %v", got)
+		}
+	})
+
+	t.Run("set field inside second array element", func(t *testing.T) {
+		data := makeData(`{"users":[{"name":"alice"},{"name":"bob"}]}`)
+		if err := setValueByPath(data, "users[1].name", "charlie"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["users"].([]interface{})[1].(map[string]interface{})["name"]
+		if got != "charlie" {
+			t.Fatalf("expected charlie, got %v", got)
+		}
+	})
+
+	t.Run("set deeply nested field inside array", func(t *testing.T) {
+		data := makeData(`{"level1":{"level2":[{"level3":{"level4":"deep"}}]}}`)
+		if err := setValueByPath(data, "level1.level2[0].level3.level4", "changed"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["level1"].(map[string]interface{})["level2"].([]interface{})[0].(map[string]interface{})["level3"].(map[string]interface{})["level4"]
+		if got != "changed" {
+			t.Fatalf("expected changed, got %v", got)
+		}
+	})
+
+	t.Run("set field to map value", func(t *testing.T) {
+		data := makeData(`{"meta":{}}`)
+		newMap := map[string]interface{}{"key": "value"}
+		if err := setValueByPath(data, "meta", newMap); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["meta"]
+		m, ok := got.(map[string]interface{})
+		if !ok || m["key"] != "value" {
+			t.Fatalf("expected map with key=value, got %v", got)
+		}
+	})
+
+	t.Run("set field to slice value", func(t *testing.T) {
+		data := makeData(`{"tags":[]}`)
+		if err := setValueByPath(data, "tags", []interface{}{"go", "test"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["tags"].([]interface{})
+		if len(got) != 2 || got[0] != "go" || got[1] != "test" {
+			t.Fatalf("expected [go test], got %v", got)
+		}
+	})
+
+	t.Run("set new top-level key (upsert)", func(t *testing.T) {
+		data := makeData(`{"a":1}`)
+		if err := setValueByPath(data, "b", "x"); err != nil {
+			t.Fatalf("unexpected error setting new key: %v", err)
+		}
+		got := data.(map[string]interface{})["b"]
+		if got != "x" {
+			t.Fatalf("expected x, got %v", got)
+		}
+	})
+
+	t.Run("error: missing nested key", func(t *testing.T) {
+		data := makeData(`{"a":{"b":1}}`)
+		err := setValueByPath(data, "a.c.d", "x")
+		if err == nil {
+			t.Fatal("expected error for missing key 'c'")
+		}
+	})
+
+	t.Run("error: index out of bounds", func(t *testing.T) {
+		data := makeData(`{"arr":[1,2,3]}`)
+		err := setValueByPath(data, "arr[5]", "x")
+		if err == nil {
+			t.Fatal("expected error for out-of-bounds index")
+		}
+	})
+
+	t.Run("error: index on non-array", func(t *testing.T) {
+		data := makeData(`{"arr":"notanarray"}`)
+		err := setValueByPath(data, "arr[0]", "x")
+		if err == nil {
+			t.Fatal("expected error when indexing non-array")
+		}
+	})
+
+	t.Run("error: map key on non-map", func(t *testing.T) {
+		data := makeData(`{"a":42}`)
+		err := setValueByPath(data, "a.b", "x")
+		if err == nil {
+			t.Fatal("expected error when traversing into non-map")
+		}
+	})
+
+	t.Run("error: invalid array index (non-numeric)", func(t *testing.T) {
+		data := makeData(`{"arr":[1,2,3]}`)
+		err := setValueByPath(data, "arr[abc]", "x")
+		if err == nil {
+			t.Fatal("expected error for non-numeric array index")
+		}
+	})
+
+	t.Run("set last array element", func(t *testing.T) {
+		data := makeData(`{"arr":[10,20,30]}`)
+		if err := setValueByPath(data, "arr[2]", 99); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		arr := data.(map[string]interface{})["arr"].([]interface{})
+		if arr[2] != 99 {
+			t.Fatalf("expected 99, got %v", arr[2])
+		}
+	})
+
+	t.Run("set field to nil (null)", func(t *testing.T) {
+		data := makeData(`{"a":"something"}`)
+		if err := setValueByPath(data, "a", nil); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got := data.(map[string]interface{})["a"]
+		if got != nil {
+			t.Fatalf("expected nil, got %v", got)
+		}
+	})
+
+	t.Run("multiple sequential sets on same data", func(t *testing.T) {
+		data := makeData(`{"a":"x","b":"y","c":"z"}`)
+		if err := setValueByPath(data, "a", "A"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := setValueByPath(data, "b", "B"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := setValueByPath(data, "c", "C"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		m := data.(map[string]interface{})
+		if m["a"] != "A" || m["b"] != "B" || m["c"] != "C" {
+			t.Fatalf("unexpected values: %v", m)
+		}
+	})
+}
 
 func TestSendRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -61,6 +61,84 @@ func TestRedisExpectNotFound(t *testing.T) {
 	client.ExpectNotFound("missing")
 }
 
+func TestRedisSetJsonField(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	// Store initial JSON
+	client.Set("eeeee", `{"a":{"b":[{"c":"old"}]}}`, 0)
+
+	// Set nested field
+	client.SetJsonField("eeeee", "a.b[0].c", "something")
+
+	// Verify via ExpectJsonField
+	client.ExpectJsonField("eeeee", "a.b[0].c", "something")
+
+	// Set a top-level field
+	client.Set("obj", `{"name":"alice","score":10}`, 0)
+	client.SetJsonField("obj", "score", 99)
+	client.ExpectJsonField("obj", "score", float64(99))
+
+	// Set a field two levels deep
+	client.Set("deep", `{"x":{"y":{"z":"before"}}}`, 0)
+	client.SetJsonField("deep", "x.y.z", "after")
+	client.ExpectJsonField("deep", "x.y.z", "after")
+}
+
+func TestRedisSetJsonFieldFailsOnMissingKey(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		client.SetJsonField("nonexistent", "a.b", "val")
+	}()
+
+	if !panicked {
+		t.Fatal("expected Fail (panic) for missing key")
+	}
+}
+
+func TestRedisExpectJsonFieldFailsOnDecodeError(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+	client.Set("bad", "not-json", 0)
+
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		client.ExpectJsonField("bad", "a", "x")
+	}()
+
+	if !panicked {
+		t.Fatal("expected Fail (panic) for decode error")
+	}
+}
+
 func TestRedisHashHelpers(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {

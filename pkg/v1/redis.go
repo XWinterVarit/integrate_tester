@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -178,6 +179,92 @@ func (c *RedisClient) HIncrement(key, field string, increment int64) int64 {
 		Fail("Failed to hincrby redis key %s field %s: %v", key, field, err)
 	}
 	return val
+}
+
+// SetJsonField retrieves the JSON value stored at key, sets the field at the given
+// dot+bracket path (e.g. "a.b[0].c") to value, and saves the updated JSON back.
+// Fails if the key is not found, the value is not valid JSON, or the path is invalid.
+func (c *RedisClient) SetJsonField(key string, path string, value interface{}) {
+	RecordAction(fmt.Sprintf("Redis SetJsonField: %s %s", key, path), func() { c.SetJsonField(key, path, value) })
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	Logf(LogTypeRedis, "SetJsonField %s path=%s value=%v", key, path, value)
+
+	raw, err := c.client.Get(context.Background(), key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			Fail("Redis key %s not found", key)
+		}
+		Fail("Failed to get redis key %s: %v", key, err)
+	}
+
+	var data interface{}
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		Fail("SetJsonField: value at key %s is not valid JSON: %v", key, err)
+	}
+
+	if err := setValueByPath(data, path, value); err != nil {
+		Fail("SetJsonField: failed to set path '%s' on key %s: %v", path, key, err)
+	}
+
+	updated, err := json.Marshal(data)
+	if err != nil {
+		Fail("SetJsonField: failed to marshal updated JSON for key %s: %v", key, err)
+	}
+
+	ttl, err := c.client.TTL(context.Background(), key).Result()
+	if err != nil {
+		Fail("SetJsonField: failed to get TTL for key %s: %v", key, err)
+	}
+	if err := c.client.Set(context.Background(), key, string(updated), ttl).Err(); err != nil {
+		Fail("SetJsonField: failed to save updated JSON for key %s: %v", key, err)
+	}
+}
+
+// ExpectJsonField retrieves the JSON value stored at key, reads the field at the
+// given dot+bracket path (e.g. "a.b[0].c"), and asserts it equals expectedValue.
+// Fails if the key is not found, the value is not valid JSON, or the path is invalid.
+func (c *RedisClient) ExpectJsonField(key string, path string, expectedValue interface{}) {
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+
+	raw, err := c.client.Get(context.Background(), key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			Fail("Redis key %s not found", key)
+		}
+		Fail("Failed to get redis key %s: %v", key, err)
+	}
+
+	var data interface{}
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		Fail("ExpectJsonField: value at key %s is not valid JSON: %v", key, err)
+	}
+
+	gotValue, err := getValueByPath(data, path)
+	if err != nil {
+		Fail("ExpectJsonField: failed to get path '%s' on key %s: %v", path, key, err)
+	}
+
+	match := false
+	if isNumber(gotValue) && isNumber(expectedValue) {
+		match = toFloat64(gotValue) == toFloat64(expectedValue)
+	} else {
+		match = fmt.Sprintf("%v", gotValue) == fmt.Sprintf("%v", expectedValue)
+	}
+
+	if !match {
+		Fail("ExpectJsonField failed for key %s path '%s':\nExpected: %v (%T)\nGot:      %v (%T)", key, path, expectedValue, expectedValue, gotValue, gotValue)
+	}
+	Logf(LogTypeExpect, "Redis key %s path '%s' == %v - PASSED", key, path, expectedValue)
 }
 
 // FlushAll removes all keys from the current database.

@@ -375,6 +375,119 @@ func getValueByPath(data interface{}, path string) (interface{}, error) {
 	return current, nil
 }
 
+// setValueByPath sets a value in a nested map/slice structure at the given dot+bracket path.
+// It supports dot notation and array indices (e.g. "a.b[0].c").
+func setValueByPath(data interface{}, path string, value interface{}) error {
+	parts := strings.Split(path, ".")
+
+	// parsePart splits a segment like "key[0]" into (key, index).
+	// If no array index, index is -1.
+	parsePart := func(part string) (string, int, error) {
+		if strings.Contains(part, "[") && strings.HasSuffix(part, "]") {
+			open := strings.Index(part, "[")
+			close := strings.LastIndex(part, "]")
+			key := ""
+			if open > 0 {
+				key = part[:open]
+			}
+			idx, err := strconv.Atoi(part[open+1 : close])
+			if err != nil {
+				return "", -1, fmt.Errorf("invalid array index in path segment '%s': %v", part, err)
+			}
+			return key, idx, nil
+		}
+		return part, -1, nil
+	}
+
+	var walk func(current interface{}, parts []string) error
+	walk = func(current interface{}, parts []string) error {
+		if len(parts) == 0 {
+			return nil
+		}
+
+		part := parts[0]
+		key, index, err := parsePart(part)
+		if err != nil {
+			return err
+		}
+
+		isLast := len(parts) == 1
+
+		// helper: resolve the "next" container after applying key then index
+		resolveNext := func() (interface{}, error) {
+			var afterKey interface{} = current
+			if key != "" {
+				m, ok := current.(map[string]interface{})
+				if !ok {
+					return nil, fmt.Errorf("expected map at '%s' but got %T", key, current)
+				}
+				v, exists := m[key]
+				if !exists {
+					return nil, fmt.Errorf("key '%s' not found", key)
+				}
+				afterKey = v
+			}
+			if index >= 0 {
+				arr, ok := afterKey.([]interface{})
+				if !ok {
+					return nil, fmt.Errorf("expected array for index [%d] but got %T", index, afterKey)
+				}
+				if index >= len(arr) {
+					return nil, fmt.Errorf("index %d out of bounds (len: %d)", index, len(arr))
+				}
+				return arr[index], nil
+			}
+			return afterKey, nil
+		}
+
+		if isLast {
+			// Set the value here
+			if key != "" {
+				m, ok := current.(map[string]interface{})
+				if !ok {
+					return fmt.Errorf("expected map at '%s' but got %T", key, current)
+				}
+				if index >= 0 {
+					// e.g. "arr[0]" as last segment
+					v, exists := m[key]
+					if !exists {
+						return fmt.Errorf("key '%s' not found", key)
+					}
+					arr, ok := v.([]interface{})
+					if !ok {
+						return fmt.Errorf("expected array for index [%d] but got %T", index, v)
+					}
+					if index >= len(arr) {
+						return fmt.Errorf("index %d out of bounds (len: %d)", index, len(arr))
+					}
+					arr[index] = value
+				} else {
+					m[key] = value
+				}
+			} else if index >= 0 {
+				arr, ok := current.([]interface{})
+				if !ok {
+					return fmt.Errorf("expected array for index [%d] but got %T", index, current)
+				}
+				if index >= len(arr) {
+					return fmt.Errorf("index %d out of bounds (len: %d)", index, len(arr))
+				}
+				arr[index] = value
+			}
+			return nil
+		}
+
+		// Not last: recurse into next container
+		next, err := resolveNext()
+		if err != nil {
+			return err
+		}
+		return walk(next, parts[1:])
+	}
+
+	return walk(data, parts)
+}
+
 func isNumber(i interface{}) bool {
 	switch i.(type) {
 	case int, int8, int16, int32, int64,
