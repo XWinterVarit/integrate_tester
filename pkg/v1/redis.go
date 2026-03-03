@@ -90,6 +90,42 @@ func (c *RedisClient) ExpectValue(key string, expected string) {
 	Logf(LogTypeExpect, "Redis key %s == %s - PASSED", key, expected)
 }
 
+// ExpectFound asserts that a key exists in Redis.
+func (c *RedisClient) ExpectFound(key string) {
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	exists, err := c.client.Exists(context.Background(), key).Result()
+	if err != nil {
+		Fail("Failed to check existence of redis key %s: %v", key, err)
+	}
+	if exists == 0 {
+		Fail("Expected redis key %s to exist, but it was not found", key)
+	}
+	Logf(LogTypeExpect, "Redis key %s exists - PASSED", key)
+}
+
+// ExpectNotFound asserts that a key does not exist in Redis.
+func (c *RedisClient) ExpectNotFound(key string) {
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	exists, err := c.client.Exists(context.Background(), key).Result()
+	if err != nil {
+		Fail("Failed to check existence of redis key %s: %v", key, err)
+	}
+	if exists != 0 {
+		Fail("Expected redis key %s to not exist, but it was found", key)
+	}
+	Logf(LogTypeExpect, "Redis key %s does not exist - PASSED", key)
+}
+
 // HSet sets a field in a hash.
 func (c *RedisClient) HSet(key, field string, value interface{}) {
 	RecordAction(fmt.Sprintf("Redis HSet: %s %s", key, field), func() { c.HSet(key, field, value) })

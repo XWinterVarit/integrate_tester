@@ -36,6 +36,31 @@ func TestRedisHelpers(t *testing.T) {
 	}
 }
 
+func TestRedisExpectFound(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	client.Set("existing", "value", time.Minute)
+	client.ExpectFound("existing")
+}
+
+func TestRedisExpectNotFound(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	client.ExpectNotFound("missing")
+}
+
 func TestRedisHashHelpers(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {
