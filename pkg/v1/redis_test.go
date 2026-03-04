@@ -139,6 +139,86 @@ func TestRedisExpectJsonFieldFailsOnDecodeError(t *testing.T) {
 	}
 }
 
+func TestRedisHSetJsonField(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	// Store initial JSON in a hash field
+	client.HSet("user:1", "profile", `{"name":"alice","score":10,"address":{"city":"Bangkok"}}`)
+
+	// Set a top-level field
+	client.HSetJsonField("user:1", "profile", "score", 99)
+	client.HExpectJsonField("user:1", "profile", "score", float64(99))
+
+	// Set a nested field
+	client.HSetJsonField("user:1", "profile", "address.city", "Chiang Mai")
+	client.HExpectJsonField("user:1", "profile", "address.city", "Chiang Mai")
+
+	// Set a field with array index
+	client.HSet("user:2", "data", `{"items":[{"id":1},{"id":2}]}`)
+	client.HSetJsonField("user:2", "data", "items[0].id", 42)
+	client.HExpectJsonField("user:2", "data", "items[0].id", float64(42))
+
+	// Set deep nested path
+	client.HSet("user:3", "config", `{"a":{"b":[{"c":"old"}]}}`)
+	client.HSetJsonField("user:3", "config", "a.b[0].c", "new")
+	client.HExpectJsonField("user:3", "config", "a.b[0].c", "new")
+}
+
+func TestRedisHSetJsonFieldFailsOnMissingField(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		client.HSetJsonField("nonexistent", "field", "a.b", "val")
+	}()
+
+	if !panicked {
+		t.Fatal("expected Fail (panic) for missing hash key/field")
+	}
+}
+
+func TestRedisHExpectJsonFieldFailsOnDecodeError(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
+	client := ConnectRedis(mr.Addr(), "", 0)
+	client.HSet("myhash", "badjson", "not-json")
+
+	panicked := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = true
+			}
+		}()
+		client.HExpectJsonField("myhash", "badjson", "a", "x")
+	}()
+
+	if !panicked {
+		t.Fatal("expected Fail (panic) for decode error")
+	}
+}
+
 func TestRedisHashHelpers(t *testing.T) {
 	mr, err := miniredis.Run()
 	if err != nil {

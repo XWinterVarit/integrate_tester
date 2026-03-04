@@ -225,6 +225,92 @@ func (c *RedisClient) SetJsonField(key string, path string, value interface{}) {
 	}
 }
 
+// HSetJsonField retrieves the JSON value stored in a hash field at key/field, sets the
+// nested field at the given dot+bracket path (e.g. "a.b[0].c") to value, and saves
+// the updated JSON back. Fails if the key/field is not found, the value is not valid
+// JSON, or the path is invalid.
+func (c *RedisClient) HSetJsonField(key, field, path string, value interface{}) {
+	RecordAction(fmt.Sprintf("Redis HSetJsonField: %s %s %s", key, field, path), func() {
+		c.HSetJsonField(key, field, path, value)
+	})
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+	Logf(LogTypeRedis, "HSetJsonField %s field=%s path=%s value=%v", key, field, path, value)
+
+	raw, err := c.client.HGet(context.Background(), key, field).Result()
+	if err != nil {
+		if err == redis.Nil {
+			Fail("Redis hash key %s field %s not found", key, field)
+		}
+		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
+	}
+
+	var data interface{}
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		Fail("HSetJsonField: value at key %s field %s is not valid JSON: %v", key, field, err)
+	}
+
+	if err := setValueByPath(data, path, value); err != nil {
+		Fail("HSetJsonField: failed to set path '%s' on key %s field %s: %v", path, key, field, err)
+	}
+
+	updated, err := json.Marshal(data)
+	if err != nil {
+		Fail("HSetJsonField: failed to marshal updated JSON for key %s field %s: %v", key, field, err)
+	}
+
+	if err := c.client.HSet(context.Background(), key, field, string(updated)).Err(); err != nil {
+		Fail("HSetJsonField: failed to save updated JSON for key %s field %s: %v", key, field, err)
+	}
+}
+
+// HExpectJsonField retrieves the JSON value stored in a hash field at key/field, reads
+// the nested field at the given dot+bracket path (e.g. "a.b[0].c"), and asserts it
+// equals expectedValue. Fails if the key/field is not found, the value is not valid
+// JSON, or the path is invalid.
+func (c *RedisClient) HExpectJsonField(key, field, path string, expectedValue interface{}) {
+	if IsDryRun() {
+		return
+	}
+	if c.client == nil {
+		Fail("RedisClient is not connected")
+	}
+
+	raw, err := c.client.HGet(context.Background(), key, field).Result()
+	if err != nil {
+		if err == redis.Nil {
+			Fail("Redis hash key %s field %s not found", key, field)
+		}
+		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
+	}
+
+	var data interface{}
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		Fail("HExpectJsonField: value at key %s field %s is not valid JSON: %v", key, field, err)
+	}
+
+	gotValue, err := getValueByPath(data, path)
+	if err != nil {
+		Fail("HExpectJsonField: failed to get path '%s' on key %s field %s: %v", path, key, field, err)
+	}
+
+	match := false
+	if isNumber(gotValue) && isNumber(expectedValue) {
+		match = toFloat64(gotValue) == toFloat64(expectedValue)
+	} else {
+		match = fmt.Sprintf("%v", gotValue) == fmt.Sprintf("%v", expectedValue)
+	}
+
+	if !match {
+		Fail("HExpectJsonField failed for key %s field %s path '%s':\nExpected: %v (%T)\nGot:      %v (%T)", key, field, path, expectedValue, expectedValue, gotValue, gotValue)
+	}
+	Logf(LogTypeExpect, "Redis key %s field %s path '%s' == %v - PASSED", key, field, path, expectedValue)
+}
+
 // ExpectJsonField retrieves the JSON value stored at key, reads the field at the
 // given dot+bracket path (e.g. "a.b[0].c"), and asserts it equals expectedValue.
 // Fails if the key is not found, the value is not valid JSON, or the path is invalid.
