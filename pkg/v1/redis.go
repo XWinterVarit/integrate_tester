@@ -1,31 +1,30 @@
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	rms "github.com/XWinterVarit/integrate_tester/pkg/redis-mock-server"
 )
 
-// RedisClient wraps a go-redis client for test helpers.
+// RedisClient wraps a redis-mock-server client for test helpers.
 type RedisClient struct {
-	client *redis.Client
+	client *rms.Client
 }
 
-// ConnectRedis connects to Redis using go-redis/v9.
-func ConnectRedis(addr, password string, db int) *RedisClient {
-	RecordAction(fmt.Sprintf("Redis Connect: %s", addr), func() { ConnectRedis(addr, password, db) })
+// ConnectRedis connects to Redis Mock Server using server address and access key.
+func ConnectRedis(serverAddr, accessKey string) *RedisClient {
+	RecordAction(fmt.Sprintf("Redis Connect: %s", serverAddr), func() { ConnectRedis(serverAddr, accessKey) })
 	if IsDryRun() {
 		return &RedisClient{}
 	}
-	Logf(LogTypeRedis, "Connecting to Redis at %s (db=%d)", addr, db)
-	c := redis.NewClient(&redis.Options{Addr: addr, Password: password, DB: db})
-	if err := c.Ping(context.Background()).Err(); err != nil {
-		Fail("Failed to connect to Redis: %v", err)
+	Logf(LogTypeRedis, "Connecting to Redis Mock Server at %s", serverAddr)
+	c := rms.NewClient(serverAddr, accessKey)
+	if err := c.Ping(); err != nil {
+		Fail("Failed to connect to Redis Mock Server: %v", err)
 	}
-	Log(LogTypeRedis, "Connected to Redis", "")
+	Log(LogTypeRedis, "Connected to Redis Mock Server", "")
 	return &RedisClient{client: c}
 }
 
@@ -39,7 +38,7 @@ func (c *RedisClient) Set(key string, value interface{}, expiration time.Duratio
 		Fail("RedisClient is not connected")
 	}
 	Log(LogTypeRedis, fmt.Sprintf("SET %s", key), fmt.Sprintf("value=%v, ttl=%s", value, expiration))
-	if err := c.client.Set(context.Background(), key, value, expiration).Err(); err != nil {
+	if err := c.client.Set(key, value, expiration); err != nil {
 		Fail("Failed to set redis key %s: %v", key, err)
 	}
 }
@@ -54,9 +53,9 @@ func (c *RedisClient) Get(key string) string {
 		Fail("RedisClient is not connected")
 	}
 	Logf(LogTypeRedis, "GET %s", key)
-	val, err := c.client.Get(context.Background(), key).Result()
+	val, err := c.client.Get(key)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis key %s not found", key)
 		}
 		Fail("Failed to get redis key %s: %v", key, err)
@@ -74,7 +73,7 @@ func (c *RedisClient) Del(keys ...string) {
 		Fail("RedisClient is not connected")
 	}
 	Log(LogTypeRedis, "DEL keys", fmt.Sprintf("%v", keys))
-	if err := c.client.Del(context.Background(), keys...).Err(); err != nil {
+	if err := c.client.Del(keys...); err != nil {
 		Fail("Failed to delete redis keys %v: %v", keys, err)
 	}
 }
@@ -99,7 +98,7 @@ func (c *RedisClient) ExpectFound(key string) {
 	if c.client == nil {
 		Fail("RedisClient is not connected")
 	}
-	exists, err := c.client.Exists(context.Background(), key).Result()
+	exists, err := c.client.Exists(key)
 	if err != nil {
 		Fail("Failed to check existence of redis key %s: %v", key, err)
 	}
@@ -117,7 +116,7 @@ func (c *RedisClient) ExpectNotFound(key string) {
 	if c.client == nil {
 		Fail("RedisClient is not connected")
 	}
-	exists, err := c.client.Exists(context.Background(), key).Result()
+	exists, err := c.client.Exists(key)
 	if err != nil {
 		Fail("Failed to check existence of redis key %s: %v", key, err)
 	}
@@ -137,7 +136,7 @@ func (c *RedisClient) HSet(key, field string, value interface{}) {
 		Fail("RedisClient is not connected")
 	}
 	Log(LogTypeRedis, fmt.Sprintf("HSET %s %s", key, field), fmt.Sprintf("value=%v", value))
-	if err := c.client.HSet(context.Background(), key, field, value).Err(); err != nil {
+	if err := c.client.HSet(key, field, value); err != nil {
 		Fail("Failed to hset redis key %s field %s: %v", key, field, err)
 	}
 }
@@ -152,9 +151,9 @@ func (c *RedisClient) HGet(key, field string) string {
 		Fail("RedisClient is not connected")
 	}
 	Logf(LogTypeRedis, "HGET %s %s", key, field)
-	val, err := c.client.HGet(context.Background(), key, field).Result()
+	val, err := c.client.HGet(key, field)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis hash key %s field %s not found", key, field)
 		}
 		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
@@ -174,7 +173,7 @@ func (c *RedisClient) HIncrement(key, field string, increment int64) int64 {
 		Fail("RedisClient is not connected")
 	}
 	Logf(LogTypeRedis, "HINCRBY %s %s %d", key, field, increment)
-	val, err := c.client.HIncrBy(context.Background(), key, field, increment).Result()
+	val, err := c.client.HIncrBy(key, field, increment)
 	if err != nil {
 		Fail("Failed to hincrby redis key %s field %s: %v", key, field, err)
 	}
@@ -194,9 +193,9 @@ func (c *RedisClient) SetJsonField(key string, path string, value interface{}) {
 	}
 	Logf(LogTypeRedis, "SetJsonField %s path=%s value=%v", key, path, value)
 
-	raw, err := c.client.Get(context.Background(), key).Result()
+	raw, err := c.client.Get(key)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis key %s not found", key)
 		}
 		Fail("Failed to get redis key %s: %v", key, err)
@@ -216,11 +215,11 @@ func (c *RedisClient) SetJsonField(key string, path string, value interface{}) {
 		Fail("SetJsonField: failed to marshal updated JSON for key %s: %v", key, err)
 	}
 
-	ttl, err := c.client.TTL(context.Background(), key).Result()
+	ttl, err := c.client.TTL(key)
 	if err != nil {
 		Fail("SetJsonField: failed to get TTL for key %s: %v", key, err)
 	}
-	if err := c.client.Set(context.Background(), key, string(updated), ttl).Err(); err != nil {
+	if err := c.client.Set(key, string(updated), ttl); err != nil {
 		Fail("SetJsonField: failed to save updated JSON for key %s: %v", key, err)
 	}
 }
@@ -241,9 +240,9 @@ func (c *RedisClient) HSetJsonField(key, field, path string, value interface{}) 
 	}
 	Logf(LogTypeRedis, "HSetJsonField %s field=%s path=%s value=%v", key, field, path, value)
 
-	raw, err := c.client.HGet(context.Background(), key, field).Result()
+	raw, err := c.client.HGet(key, field)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis hash key %s field %s not found", key, field)
 		}
 		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
@@ -263,7 +262,7 @@ func (c *RedisClient) HSetJsonField(key, field, path string, value interface{}) 
 		Fail("HSetJsonField: failed to marshal updated JSON for key %s field %s: %v", key, field, err)
 	}
 
-	if err := c.client.HSet(context.Background(), key, field, string(updated)).Err(); err != nil {
+	if err := c.client.HSet(key, field, string(updated)); err != nil {
 		Fail("HSetJsonField: failed to save updated JSON for key %s field %s: %v", key, field, err)
 	}
 }
@@ -280,9 +279,9 @@ func (c *RedisClient) HExpectJsonField(key, field, path string, expectedValue in
 		Fail("RedisClient is not connected")
 	}
 
-	raw, err := c.client.HGet(context.Background(), key, field).Result()
+	raw, err := c.client.HGet(key, field)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis hash key %s field %s not found", key, field)
 		}
 		Fail("Failed to hget redis key %s field %s: %v", key, field, err)
@@ -322,9 +321,9 @@ func (c *RedisClient) ExpectJsonField(key string, path string, expectedValue int
 		Fail("RedisClient is not connected")
 	}
 
-	raw, err := c.client.Get(context.Background(), key).Result()
+	raw, err := c.client.Get(key)
 	if err != nil {
-		if err == redis.Nil {
+		if err.Error() == "redis: nil" {
 			Fail("Redis key %s not found", key)
 		}
 		Fail("Failed to get redis key %s: %v", key, err)
@@ -363,7 +362,7 @@ func (c *RedisClient) FlushAll() {
 		Fail("RedisClient is not connected")
 	}
 	Log(LogTypeRedis, "FLUSHALL", "")
-	if err := c.client.FlushDB(context.Background()).Err(); err != nil {
+	if err := c.client.FlushDB(); err != nil {
 		Fail("Failed to flush redis db: %v", err)
 	}
 }

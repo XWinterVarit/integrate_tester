@@ -124,11 +124,15 @@ func main() {
 	})
 
 	t.Stage("Redis Hash Operations", func() {
-		redisAddr := "localhost:6379"
-		if addr := os.Getenv("REDIS_ADDR"); addr != "" {
-			redisAddr = addr
+		redisServerAddr := "http://localhost:9100"
+		if addr := os.Getenv("REDIS_SERVER_ADDR"); addr != "" {
+			redisServerAddr = addr
 		}
-		redis := v1.ConnectRedis(redisAddr, "", 0)
+		redisAccessKey := "default-key"
+		if key := os.Getenv("REDIS_ACCESS_KEY"); key != "" {
+			redisAccessKey = key
+		}
+		redis := v1.ConnectRedis(redisServerAddr, redisAccessKey)
 
 		// HSet: store user profile fields in a hash
 		redis.HSet("profile:1", "name", "Alice")

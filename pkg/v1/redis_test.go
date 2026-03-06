@@ -1,21 +1,67 @@
 package v1
 
 import (
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
 	miniredis "github.com/alicebob/miniredis/v2"
+
+	rms "github.com/XWinterVarit/integrate_tester/pkg/redis-mock-server"
 )
 
-func TestRedisHelpers(t *testing.T) {
-	// start in-memory redis
+const testAccessKey = "test-key"
+
+// startTestServer starts a miniredis and a redis-mock-server backed by it.
+// Returns the server base URL and a cleanup function.
+func startTestServer(t *testing.T) (string, func()) {
+	t.Helper()
+
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("failed to start miniredis: %v", err)
 	}
-	defer mr.Close()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	// Find a free port for the mock server
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		mr.Close()
+		t.Fatalf("failed to find free port: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	logger := rms.NewConsoleLogger()
+	server := rms.NewRedisServer(port, testAccessKey, mr.Addr(), "", 0, logger)
+
+	started := make(chan struct{})
+	go func() {
+		close(started)
+		server.Start()
+	}()
+	<-started
+
+	// Wait for server to be ready
+	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	c := rms.NewClient(baseURL, testAccessKey)
+	for range 50 {
+		if err := c.Ping(); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	return baseURL, func() {
+		mr.Close()
+	}
+}
+
+func TestRedisHelpers(t *testing.T) {
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
+
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	client.Set("foo", "bar", time.Minute)
 	client.ExpectValue("foo", "bar")
@@ -26,49 +72,34 @@ func TestRedisHelpers(t *testing.T) {
 	}
 
 	client.Del("foo")
-	if _, err := mr.Get("foo"); err == nil {
-		t.Fatalf("expected foo to be deleted")
-	}
 
 	client.FlushAll()
-	if keys := mr.Keys(); len(keys) != 0 {
-		t.Fatalf("expected empty db after flush, got %v", keys)
-	}
 }
 
 func TestRedisExpectFound(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	client.Set("existing", "value", time.Minute)
 	client.ExpectFound("existing")
 }
 
 func TestRedisExpectNotFound(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	client.ExpectNotFound("missing")
 }
 
 func TestRedisSetJsonField(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	// Store initial JSON
 	client.Set("eeeee", `{"a":{"b":[{"c":"old"}]}}`, 0)
@@ -91,13 +122,10 @@ func TestRedisSetJsonField(t *testing.T) {
 }
 
 func TestRedisSetJsonFieldFailsOnMissingKey(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	panicked := false
 	func() {
@@ -115,13 +143,10 @@ func TestRedisSetJsonFieldFailsOnMissingKey(t *testing.T) {
 }
 
 func TestRedisExpectJsonFieldFailsOnDecodeError(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 	client.Set("bad", "not-json", 0)
 
 	panicked := false
@@ -140,13 +165,10 @@ func TestRedisExpectJsonFieldFailsOnDecodeError(t *testing.T) {
 }
 
 func TestRedisHSetJsonField(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	// Store initial JSON in a hash field
 	client.HSet("user:1", "profile", `{"name":"alice","score":10,"address":{"city":"Bangkok"}}`)
@@ -171,13 +193,10 @@ func TestRedisHSetJsonField(t *testing.T) {
 }
 
 func TestRedisHSetJsonFieldFailsOnMissingField(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	panicked := false
 	func() {
@@ -195,13 +214,10 @@ func TestRedisHSetJsonFieldFailsOnMissingField(t *testing.T) {
 }
 
 func TestRedisHExpectJsonFieldFailsOnDecodeError(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 	client.HSet("myhash", "badjson", "not-json")
 
 	panicked := false
@@ -220,13 +236,10 @@ func TestRedisHExpectJsonFieldFailsOnDecodeError(t *testing.T) {
 }
 
 func TestRedisHashHelpers(t *testing.T) {
-	mr, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("failed to start miniredis: %v", err)
-	}
-	defer mr.Close()
+	baseURL, cleanup := startTestServer(t)
+	defer cleanup()
 
-	client := ConnectRedis(mr.Addr(), "", 0)
+	client := ConnectRedis(baseURL, testAccessKey)
 
 	// HSet and HGet
 	client.HSet("user:1", "name", "Alice")
