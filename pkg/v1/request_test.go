@@ -2,10 +2,12 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -362,6 +364,102 @@ func TestSendRESTRequestWithMethodHeadersAndJSON(t *testing.T) {
 	}
 	if resp.Header["Content-Type"] != "application/json" {
 		t.Fatalf("expected content-type application/json, got %s", resp.Header["Content-Type"])
+	}
+}
+
+func TestWithXMLBody(t *testing.T) {
+	type Req struct {
+		XMLName xml.Name `xml:"request"`
+		ID      string   `xml:"id"`
+		Status  string   `xml:"status"`
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "application/xml" {
+			t.Errorf("expected Content-Type application/xml, got %s", r.Header.Get("Content-Type"))
+		}
+		body, _ := io.ReadAll(r.Body)
+		var got Req
+		if err := xml.Unmarshal(body, &got); err != nil {
+			t.Fatalf("failed to unmarshal request XML: %v", err)
+		}
+		if got.ID != "1" || got.Status != "active" {
+			t.Errorf("unexpected body: %+v", got)
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<response><id>1</id><status>active</status></response>`)
+	}))
+	defer server.Close()
+
+	resp := SendRESTRequest(server.URL,
+		WithMethod(http.MethodPost),
+		WithXMLBody(Req{ID: "1", Status: "active"}),
+	)
+
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestExpectXmlFunctions(t *testing.T) {
+	resp := Response{
+		StatusCode: 200,
+		Body:       `<response><user id="42"><name>Alice</name><role>admin</role></user><items><item>one</item><item>two</item></items></response>`,
+	}
+
+	// Success cases
+	ExpectXmlBody(resp, `<response><user id="42"><name>Alice</name><role>admin</role></user><items><item>one</item><item>two</item></items></response>`)
+	ExpectXmlBodyField(resp, "response.user.name", "Alice")
+	ExpectXmlBodyField(resp, "response.user.role", "admin")
+	ExpectXmlBodyField(resp, "response.user.@id", "42")
+	ExpectXmlBodyField(resp, "response.items.item[0]", "one")
+	ExpectXmlBodyField(resp, "response.items.item[1]", "two")
+
+	// Condition checks
+	ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionEqual, "Alice")
+	ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionContains, "lic")
+	ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionStartsWith, "Ali")
+	ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionEndsWith, "ice")
+	ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionNotEqual, "Bob")
+
+	// Failure cases
+	assertPanic := func(name string, f func()) {
+		defer func() {
+			r := recover()
+			if r == nil {
+				t.Errorf("%s expected to panic", name)
+			}
+			if _, ok := r.(TestError); !ok {
+				t.Errorf("%s panicked with unexpected type: %T", name, r)
+			}
+		}()
+		f()
+	}
+
+	assertPanic("ExpectXmlBody mismatch", func() { ExpectXmlBody(resp, `<other/>`) })
+	assertPanic("ExpectXmlBodyField missing", func() { ExpectXmlBodyField(resp, "response.missing", "x") })
+	assertPanic("ExpectXmlBodyField wrong value", func() { ExpectXmlBodyField(resp, "response.user.name", "Bob") })
+	assertPanic("ExpectXmlBodyFieldCond fail", func() {
+		ExpectXmlBodyFieldCond(resp, "response.user.name", ConditionEqual, "Bob")
+	})
+	assertPanic("ExpectXmlBody invalid xml", func() { ExpectXmlBody(Response{Body: "not xml {"}, `<a/>`) })
+}
+
+func TestPrettyXml(t *testing.T) {
+	input := `<root><child>text</child></root>`
+	result := PrettyXml(input)
+	if !strings.Contains(result, "\n") {
+		t.Errorf("Expected pretty XML with newlines, got: %s", result)
+	}
+	if !strings.Contains(result, "  <child>") {
+		t.Errorf("Expected indented child element, got: %s", result)
+	}
+
+	// Invalid XML returns original
+	invalid := "not xml at all {"
+	if PrettyXml(invalid) != invalid {
+		t.Error("Expected invalid XML to be returned unchanged")
 	}
 }
 

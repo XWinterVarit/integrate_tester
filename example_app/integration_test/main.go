@@ -128,7 +128,7 @@ func main() {
 		if addr := os.Getenv("REDIS_SERVER_ADDR"); addr != "" {
 			redisServerAddr = addr
 		}
-		redisAccessKey := "default-key"
+		redisAccessKey := "welcome"
 		if key := os.Getenv("REDIS_ACCESS_KEY"); key != "" {
 			redisAccessKey = key
 		}
@@ -204,5 +204,5 @@ func main() {
 		}
 	})
 
-	v1.RunGUI(t)
+	v1.RunCLICommand(t)
 }

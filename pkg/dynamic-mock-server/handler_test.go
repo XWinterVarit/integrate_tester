@@ -405,3 +405,151 @@ func TestHandlerExecutor_NewFeatures(t *testing.T) {
 		}
 	})
 }
+
+func TestHandlerExecutor_XmlBody(t *testing.T) {
+	xmlBody := `<request><user id="42"><name>Alice</name><role>admin</role></user><items><item>one</item><item>two</item></items></request>`
+
+	t.Run("IfRequestXmlBody", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		steps := []ResponseFuncConfig{
+			IfRequestXmlBody("request.user.name", "Equal", "Alice", "NAME_OK", "yes"),
+			IfRequestXmlBody("request.user.role", "Equal", "admin", "ROLE_OK", "yes"),
+			IfRequestXmlBody("request.user.role", "Equal", "guest", "ROLE_FAIL", "yes"),
+			IfRequestXmlBody("request.user.@id", "Equal", "42", "ATTR_OK", "yes"),
+			IfRequestXmlBody("request.items.item[1]", "Equal", "two", "ITEM_OK", "yes"),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+
+		if h.Variables["NAME_OK"] != "yes" {
+			t.Error("NAME_OK not set")
+		}
+		if h.Variables["ROLE_OK"] != "yes" {
+			t.Error("ROLE_OK not set")
+		}
+		if _, ok := h.Variables["ROLE_FAIL"]; ok {
+			t.Error("ROLE_FAIL should not be set")
+		}
+		if h.Variables["ATTR_OK"] != "yes" {
+			t.Error("ATTR_OK not set")
+		}
+		if h.Variables["ITEM_OK"] != "yes" {
+			t.Error("ITEM_OK not set")
+		}
+	})
+
+	t.Run("IfRequestXmlBodySetCase", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		steps := []ResponseFuncConfig{
+			IfRequestXmlBodySetCase("request.user.name", "Equal", "Alice", "CaseAlice"),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+
+		if h.ActiveCase != "CaseAlice" {
+			t.Errorf("Expected ActiveCase=CaseAlice, got %s", h.ActiveCase)
+		}
+	})
+
+	t.Run("ExtractRequestXmlBody", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		steps := []ResponseFuncConfig{
+			ExtractRequestXmlBody("request.user.name", "USER_NAME"),
+			ExtractRequestXmlBody("request.user.@id", "USER_ID"),
+			ExtractRequestXmlBody("request.items.item[0]", "FIRST_ITEM"),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+
+		if h.Variables["USER_NAME"] != "Alice" {
+			t.Errorf("USER_NAME mismatch, got %v", h.Variables["USER_NAME"])
+		}
+		if h.Variables["USER_ID"] != "42" {
+			t.Errorf("USER_ID mismatch, got %v", h.Variables["USER_ID"])
+		}
+		if h.Variables["FIRST_ITEM"] != "one" {
+			t.Errorf("FIRST_ITEM mismatch, got %v", h.Variables["FIRST_ITEM"])
+		}
+	})
+
+	t.Run("SetXmlBody", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		respXml := `<response><status>ok</status><name>{{.USER_NAME}}</name></response>`
+		steps := []ResponseFuncConfig{
+			ExtractRequestXmlBody("request.user.name", "USER_NAME"),
+			SetXmlBody("", respXml),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+		h.Finalize()
+
+		result := w.Body.String()
+		expected := `<response><status>ok</status><name>Alice</name></response>`
+		if result != expected {
+			t.Errorf("Body mismatch.\nExpected: %s\nGot:      %s", expected, result)
+		}
+	})
+
+	t.Run("XmlBody_EndToEnd_WithCase", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		steps := []ResponseFuncConfig{
+			IfRequestXmlBodySetCase("request.user.role", "Equal", "admin", "AdminCase"),
+			SetXmlBody("AdminCase", `<response><granted>true</granted></response>`),
+			SetXmlBody("", `<response><granted>false</granted></response>`),
+			SetStatusCode("AdminCase", 200),
+			SetStatusCode("", 403),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+		h.Finalize()
+
+		if w.Code != 200 {
+			t.Errorf("Expected status 200, got %d", w.Code)
+		}
+		expected := `<response><granted>true</granted></response>`
+		if w.Body.String() != expected {
+			t.Errorf("Body mismatch.\nExpected: %s\nGot:      %s", expected, w.Body.String())
+		}
+	})
+
+	t.Run("XmlBody_NonExistentPath", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(xmlBody))
+		w := httptest.NewRecorder()
+		h := NewHandlerExecutor(w, req)
+
+		steps := []ResponseFuncConfig{
+			IfRequestXmlBody("request.nonexistent.field", "Equal", "anything", "SHOULD_NOT_SET", "yes"),
+			ExtractRequestXmlBody("request.nonexistent.field", "SHOULD_NOT_EXIST"),
+		}
+		if err := h.Execute(steps); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+
+		if _, ok := h.Variables["SHOULD_NOT_SET"]; ok {
+			t.Error("SHOULD_NOT_SET should not be set for non-existent path")
+		}
+		if _, ok := h.Variables["SHOULD_NOT_EXIST"]; ok {
+			t.Error("SHOULD_NOT_EXIST should not be set for non-existent path")
+		}
+	})
+}

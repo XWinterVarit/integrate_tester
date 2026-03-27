@@ -107,6 +107,14 @@ func IfRequestJsonBody(field, condition string, value interface{}, dynamicVar st
 	}
 }
 
+func IfRequestXmlBody(field, condition string, value interface{}, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestXmlBody,
+		Args:  []interface{}{field, condition, value, dynamicVar, toBeValue},
+	}
+}
+
 func IfRequestPath(condition, value, dynamicVar string, toBeValue interface{}) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
@@ -135,6 +143,14 @@ func IfRequestJsonBodySetCase(field, condition string, value interface{}, caseSt
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
 		Func:  FuncIfRequestJsonBodySetCase,
+		Args:  []interface{}{field, condition, value, caseStr},
+	}
+}
+
+func IfRequestXmlBodySetCase(field, condition string, value interface{}, caseStr string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncIfRequestXmlBodySetCase,
 		Args:  []interface{}{field, condition, value, caseStr},
 	}
 }
@@ -231,6 +247,14 @@ func ExtractRequestJsonBody(field, dynamicVar string) ResponseFuncConfig {
 	return ResponseFuncConfig{
 		Group: GroupPrepareData,
 		Func:  FuncExtractRequestJsonBody,
+		Args:  []interface{}{field, dynamicVar},
+	}
+}
+
+func ExtractRequestXmlBody(field, dynamicVar string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupPrepareData,
+		Func:  FuncExtractRequestXmlBody,
 		Args:  []interface{}{field, dynamicVar},
 	}
 }
@@ -340,6 +364,14 @@ func SetJsonBody(caseStr, jsonBody string) ResponseFuncConfig {
 		Group: GroupSetupResponse,
 		Func:  FuncSetJsonBody,
 		Args:  []interface{}{caseStr, jsonBody},
+	}
+}
+
+func SetXmlBody(caseStr, xmlBody string) ResponseFuncConfig {
+	return ResponseFuncConfig{
+		Group: GroupSetupResponse,
+		Func:  FuncSetXmlBody,
+		Args:  []interface{}{caseStr, xmlBody},
 	}
 }
 

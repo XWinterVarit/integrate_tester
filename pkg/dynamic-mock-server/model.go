@@ -30,6 +30,8 @@ const (
 	FuncIfRequestHeaderSetCase   = "IfRequestHeaderSetCase"
 	FuncIfRequestJsonBody        = "IfRequestJsonBody"
 	FuncIfRequestJsonBodySetCase = "IfRequestJsonBodySetCase"
+	FuncIfRequestXmlBody         = "IfRequestXmlBody"
+	FuncIfRequestXmlBodySetCase  = "IfRequestXmlBodySetCase"
 	FuncIfRequestPath            = "IfRequestPath"
 	FuncIfRequestPathSetCase     = "IfRequestPathSetCase"
 	FuncIfRequestQuery           = "IfRequestQuery"
@@ -47,6 +49,7 @@ const (
 
 	FuncExtractRequestHeader   = "ExtractRequestHeader"
 	FuncExtractRequestJsonBody = "ExtractRequestJsonBody"
+	FuncExtractRequestXmlBody  = "ExtractRequestXmlBody"
 	FuncExtractRequestPath     = "ExtractRequestPath"
 	FuncExtractRequestQuery    = "ExtractRequestQuery"
 
@@ -66,6 +69,7 @@ const (
 
 	// SetupResponse
 	FuncSetJsonBody           = "SetJsonBody"
+	FuncSetXmlBody            = "SetXmlBody"
 	FuncSetStatusCode         = "SetStatusCode"
 	FuncSetWait               = "SetWait"
 	FuncSetRandomWait         = "SetRandomWait"

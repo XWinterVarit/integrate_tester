@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"math/rand"
@@ -17,10 +18,20 @@ import (
 )
 
 // HandlerExecutor executes the response functions
+// XMLNode represents a parsed XML element for path-based queries
+type XMLNode struct {
+	Name     string
+	Attrs    map[string]string
+	Text     string
+	Children []*XMLNode
+}
+
 type HandlerExecutor struct {
 	Variables      map[string]interface{}
 	Request        *http.Request
 	ParsedBody     interface{}
+	ParsedXMLBody  *XMLNode
+	RawBody        []byte
 	ResponseWriter http.ResponseWriter
 
 	// Response State
@@ -47,8 +58,10 @@ func (h *HandlerExecutor) Execute(funcs []ResponseFuncConfig) error {
 	if h.Request.Body != nil {
 		bodyBytes, _ := io.ReadAll(h.Request.Body)
 		h.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Restore for reading if needed
+		h.RawBody = bodyBytes
 		if len(bodyBytes) > 0 {
 			json.Unmarshal(bodyBytes, &h.ParsedBody)
+			h.ParsedXMLBody = parseXML(bodyBytes)
 		}
 	}
 
@@ -160,6 +173,17 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 
 		fieldPath := fmt.Sprintf("%v", args[0])
 		actualVal = h.getJSONPath(fieldPath)
+	case FuncIfRequestXmlBody:
+		if len(args) < 5 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		targetVar = fmt.Sprintf("%v", args[3])
+		toBeVal = h.resolveArg(args[4])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		actualVal = h.getXMLPath(fieldPath)
 	case FuncIfRequestPath:
 		if len(args) < 4 {
 			return nil
@@ -271,6 +295,21 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 
 		fieldPath := fmt.Sprintf("%v", args[0])
 		actualVal = h.getJSONPath(fieldPath)
+		if h.checkCondition(actualVal, condition, expectedVal) {
+			h.ActiveCase = caseStr
+		}
+		return nil
+
+	case FuncIfRequestXmlBodySetCase:
+		if len(args) < 4 {
+			return nil
+		}
+		condition = fmt.Sprintf("%v", args[1])
+		expectedVal = h.resolveArg(args[2])
+		caseStr := fmt.Sprintf("%v", args[3])
+
+		fieldPath := fmt.Sprintf("%v", args[0])
+		actualVal = h.getXMLPath(fieldPath)
 		if h.checkCondition(actualVal, condition, expectedVal) {
 			h.ActiveCase = caseStr
 		}
@@ -402,6 +441,18 @@ func (h *HandlerExecutor) handlePrepareData(f ResponseFuncConfig) error {
 		}
 		return nil
 
+	case FuncExtractRequestXmlBody:
+		if len(args) < 2 {
+			return nil
+		}
+		fieldPath := fmt.Sprintf("%v", args[0])
+		targetVar := fmt.Sprintf("%v", args[1])
+		val := h.getXMLPath(fieldPath)
+		if val != nil {
+			h.Variables[targetVar] = val
+		}
+		return nil
+
 	case FuncExtractRequestPath:
 		if len(args) < 1 {
 			return nil
@@ -462,6 +513,115 @@ func (h *HandlerExecutor) checkCondition(actual interface{}, cond string, expect
 		}
 	}
 	return false
+}
+
+func parseXML(data []byte) *XMLNode {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	var root *XMLNode
+	var stack []*XMLNode
+
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			break
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			node := &XMLNode{
+				Name:  t.Name.Local,
+				Attrs: make(map[string]string),
+			}
+			for _, attr := range t.Attr {
+				node.Attrs[attr.Name.Local] = attr.Value
+			}
+			if len(stack) > 0 {
+				parent := stack[len(stack)-1]
+				parent.Children = append(parent.Children, node)
+			} else {
+				root = node
+			}
+			stack = append(stack, node)
+		case xml.EndElement:
+			if len(stack) > 0 {
+				// Trim text of the closing element
+				stack[len(stack)-1].Text = strings.TrimSpace(stack[len(stack)-1].Text)
+				stack = stack[:len(stack)-1]
+			}
+		case xml.CharData:
+			if len(stack) > 0 {
+				stack[len(stack)-1].Text += string(t)
+			}
+		}
+	}
+	return root
+}
+
+// getXMLPath navigates an XML tree using a dot-separated path.
+// Supports element names, array indexing (e.g. "items.item[1]"), and attribute access (e.g. "user.@id").
+func (h *HandlerExecutor) getXMLPath(path string) interface{} {
+	if h.ParsedXMLBody == nil {
+		return nil
+	}
+	parts := strings.Split(path, ".")
+	current := h.ParsedXMLBody
+
+	for i, part := range parts {
+		if current == nil {
+			return nil
+		}
+
+		// Attribute access
+		if strings.HasPrefix(part, "@") {
+			attrName := part[1:]
+			if val, ok := current.Attrs[attrName]; ok {
+				return val
+			}
+			return nil
+		}
+
+		// Parse element name and optional index
+		key := part
+		idx := -1
+		if strings.Contains(part, "[") && strings.HasSuffix(part, "]") {
+			idxStart := strings.Index(part, "[")
+			key = part[:idxStart]
+			idxStr := part[idxStart+1 : len(part)-1]
+			idx, _ = strconv.Atoi(idxStr)
+		}
+
+		// If first part matches root element name, skip to root
+		if i == 0 && current.Name == key {
+			if idx >= 0 {
+				if idx != 0 {
+					return nil
+				}
+			}
+			continue
+		}
+
+		// Find matching children
+		var matches []*XMLNode
+		for _, child := range current.Children {
+			if child.Name == key {
+				matches = append(matches, child)
+			}
+		}
+		if len(matches) == 0 {
+			return nil
+		}
+
+		if idx >= 0 {
+			if idx >= len(matches) {
+				return nil
+			}
+			current = matches[idx]
+		} else {
+			current = matches[0]
+		}
+	}
+
+	// Return text content of the final node
+	return current.Text
 }
 
 func (h *HandlerExecutor) getJSONPath(path string) interface{} {
@@ -620,6 +780,8 @@ func (h *HandlerExecutor) handleSetupResponse(f ResponseFuncConfig) error {
 
 	switch f.Func {
 	case FuncSetJsonBody:
+		h.Body = fmt.Sprintf("%v", args[1])
+	case FuncSetXmlBody:
 		h.Body = fmt.Sprintf("%v", args[1])
 	case FuncSetStatusCode:
 		h.StatusCode = int(toFloat(args[1]))

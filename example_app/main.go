@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
@@ -242,6 +243,55 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"id": "%s", "status": "%s"}`, id, status)
+	})
+
+	// API: Update Data via XML body (POST)
+	// POST /update-xml
+	// Body: <request><id>1</id><status>updated</status></request>
+	http.HandleFunc("/update-xml", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+
+		var payload struct {
+			XMLName xml.Name `xml:"request"`
+			ID      string   `xml:"id"`
+			Status  string   `xml:"status"`
+		}
+		if err := xml.Unmarshal(body, &payload); err != nil {
+			http.Error(w, "invalid xml", http.StatusBadRequest)
+			return
+		}
+
+		if payload.ID == "" || payload.Status == "" {
+			http.Error(w, "missing id or status", http.StatusBadRequest)
+			return
+		}
+
+		var query string
+		if *driver == "sqlite3" {
+			query = "UPDATE users SET status = ? WHERE id = ?"
+		} else {
+			query = "UPDATE users SET status = :1 WHERE id = :2"
+		}
+
+		_, err = db.Exec(query, payload.Status, payload.ID)
+		if err != nil {
+			log.Printf("Update-xml error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `<response><id>%s</id><status>%s</status></response>`, payload.ID, payload.Status)
 	})
 
 	// API: Call Mock

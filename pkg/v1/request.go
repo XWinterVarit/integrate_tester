@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -73,6 +74,8 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 			if pretty, err := json.MarshalIndent(jsonObj, "", "  "); err == nil {
 				requestPrettyBody = string(pretty)
 			}
+		} else if p := PrettyXml(string(cfg.body)); p != string(cfg.body) {
+			requestPrettyBody = p
 		}
 	}
 
@@ -101,6 +104,8 @@ func SendRESTRequest(url string, opts ...RESTRequestOption) Response {
 			if pretty, err := json.MarshalIndent(jsonObj, "", "  "); err == nil {
 				prettyBody = string(pretty)
 			}
+		} else if p := PrettyXml(string(respBody)); p != string(respBody) {
+			prettyBody = p
 		}
 	}
 
@@ -190,6 +195,24 @@ func WithJSONBody(v interface{}) RESTRequestOption {
 		c.body = data
 		if _, ok := c.headers["Content-Type"]; !ok {
 			c.headers["Content-Type"] = "application/json"
+		}
+	}
+}
+
+// WithXMLBody marshals the given value as XML and sets it as body.
+// It also sets Content-Type to application/xml if not already provided.
+func WithXMLBody(v any) RESTRequestOption {
+	return func(c *restRequestConfig) {
+		if v == nil {
+			return
+		}
+		data, err := xml.Marshal(v)
+		if err != nil {
+			Fail("Failed to marshal XML body: %v", err)
+		}
+		c.body = data
+		if _, ok := c.headers["Content-Type"]; !ok {
+			c.headers["Content-Type"] = "application/xml"
 		}
 	}
 }
@@ -509,4 +532,239 @@ func toFloat64(i interface{}) float64 {
 		return v.Float()
 	}
 	return 0
+}
+
+// xmlNode represents a parsed XML element for path-based queries.
+type xmlNode struct {
+	Name     string
+	Attrs    map[string]string
+	Text     string
+	Children []*xmlNode
+}
+
+func parseXMLToNode(data []byte) *xmlNode {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	var root *xmlNode
+	var stack []*xmlNode
+
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			break
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			node := &xmlNode{
+				Name:  t.Name.Local,
+				Attrs: make(map[string]string),
+			}
+			for _, attr := range t.Attr {
+				node.Attrs[attr.Name.Local] = attr.Value
+			}
+			if len(stack) > 0 {
+				parent := stack[len(stack)-1]
+				parent.Children = append(parent.Children, node)
+			} else {
+				root = node
+			}
+			stack = append(stack, node)
+		case xml.EndElement:
+			if len(stack) > 0 {
+				stack[len(stack)-1].Text = strings.TrimSpace(stack[len(stack)-1].Text)
+				stack = stack[:len(stack)-1]
+			}
+		case xml.CharData:
+			if len(stack) > 0 {
+				stack[len(stack)-1].Text += string(t)
+			}
+		}
+	}
+	return root
+}
+
+// getXMLPathValue navigates an XML tree using a dot-separated path.
+// Supports element names, array indexing (e.g. "items.item[1]"), and attribute access (e.g. "user.@id").
+func getXMLPathValue(root *xmlNode, path string) (any, error) {
+	if root == nil {
+		return nil, fmt.Errorf("XML body is nil or not valid XML")
+	}
+	parts := strings.Split(path, ".")
+	current := root
+
+	for i, part := range parts {
+		if current == nil {
+			return nil, fmt.Errorf("node is nil at path segment '%s'", part)
+		}
+
+		// Attribute access
+		if strings.HasPrefix(part, "@") {
+			attrName := part[1:]
+			if val, ok := current.Attrs[attrName]; ok {
+				return val, nil
+			}
+			return nil, fmt.Errorf("attribute '%s' not found", attrName)
+		}
+
+		// Parse element name and optional index
+		key := part
+		idx := -1
+		if strings.Contains(part, "[") && strings.HasSuffix(part, "]") {
+			idxStart := strings.Index(part, "[")
+			key = part[:idxStart]
+			idxStr := part[idxStart+1 : len(part)-1]
+			var err error
+			idx, err = strconv.Atoi(idxStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid array index in '%s': %v", part, err)
+			}
+		}
+
+		// If first part matches root element name, skip
+		if i == 0 && current.Name == key {
+			if idx >= 0 && idx != 0 {
+				return nil, fmt.Errorf("root index %d out of bounds", idx)
+			}
+			continue
+		}
+
+		// Find matching children
+		var matches []*xmlNode
+		for _, child := range current.Children {
+			if child.Name == key {
+				matches = append(matches, child)
+			}
+		}
+		if len(matches) == 0 {
+			return nil, fmt.Errorf("element '%s' not found", key)
+		}
+
+		if idx >= 0 {
+			if idx >= len(matches) {
+				return nil, fmt.Errorf("index %d out of bounds for element '%s' (count: %d)", idx, key, len(matches))
+			}
+			current = matches[idx]
+		} else {
+			current = matches[0]
+		}
+	}
+
+	return current.Text, nil
+}
+
+// ExpectXmlBody asserts that the response body matches the expected XML.
+// Comparison is done by re-parsing both into canonical form.
+func ExpectXmlBody(resp Response, expectedXml string) {
+	if IsDryRun() {
+		return
+	}
+	gotNode := parseXMLToNode([]byte(resp.Body))
+	if gotNode == nil {
+		Fail("ExpectXmlBody failed: response body is not valid XML. Body: %s", resp.Body)
+	}
+	expNode := parseXMLToNode([]byte(expectedXml))
+	if expNode == nil {
+		Fail("ExpectXmlBody failed: expected string is not valid XML: %s", expectedXml)
+	}
+	if !xmlNodesEqual(gotNode, expNode) {
+		Fail("ExpectXmlBody failed:\nExpected: %s\nGot:      %s", expectedXml, resp.Body)
+	}
+	Log(LogTypeExpect, "XML body matches expected value - PASSED", "")
+}
+
+func xmlNodesEqual(a, b *xmlNode) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Name != b.Name || a.Text != b.Text {
+		return false
+	}
+	if len(a.Attrs) != len(b.Attrs) {
+		return false
+	}
+	for k, v := range a.Attrs {
+		if b.Attrs[k] != v {
+			return false
+		}
+	}
+	if len(a.Children) != len(b.Children) {
+		return false
+	}
+	for i := range a.Children {
+		if !xmlNodesEqual(a.Children[i], b.Children[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// ExpectXmlBodyField asserts that a specific element in the XML response body matches the expected value.
+// field supports dot notation, array index (e.g. "root.items.item[0]"), and attribute access (e.g. "root.user.@id").
+func ExpectXmlBodyField(resp Response, field string, expectedValue string) {
+	if IsDryRun() {
+		return
+	}
+	root := parseXMLToNode([]byte(resp.Body))
+	if root == nil {
+		Fail("ExpectXmlBodyField failed: response body is not valid XML. Body: %s", resp.Body)
+	}
+	gotValue, err := getXMLPathValue(root, field)
+	if err != nil {
+		Fail("ExpectXmlBodyField failed to get field '%s': %v. Body: %s", field, err, resp.Body)
+	}
+	gotStr := fmt.Sprintf("%v", gotValue)
+	if gotStr != expectedValue {
+		Fail("ExpectXmlBodyField failed for field '%s':\nExpected: %s\nGot:      %s", field, expectedValue, gotStr)
+	}
+	Logf(LogTypeExpect, "XML Field '%s' == %s - PASSED", field, expectedValue)
+}
+
+// ExpectXmlBodyFieldCond asserts that a specific element in the XML response body
+// satisfies the provided condition against the expected value.
+func ExpectXmlBodyFieldCond(resp Response, field string, condition string, expectedValue string) {
+	if IsDryRun() {
+		return
+	}
+	root := parseXMLToNode([]byte(resp.Body))
+	if root == nil {
+		Fail("ExpectXmlBodyFieldCond failed: response body is not valid XML. Body: %s", resp.Body)
+	}
+	gotValue, err := getXMLPathValue(root, field)
+	if err != nil {
+		Fail("ExpectXmlBodyFieldCond failed to get field '%s': %v. Body: %s", field, err, resp.Body)
+	}
+	gotStr := fmt.Sprintf("%v", gotValue)
+	if !evaluateCondition(gotStr, condition, expectedValue) {
+		Fail("ExpectXmlBodyFieldCond failed for field '%s' with condition '%s':\nExpected: %s\nGot:      %s", field, condition, expectedValue, gotStr)
+	}
+	Logf(LogTypeExpect, "XML Field '%s' %s %s - PASSED", field, condition, expectedValue)
+}
+
+// PrettyXml formats an XML string with indentation for readability.
+// If the input is not valid XML, it returns the original string unchanged.
+func PrettyXml(xmlStr string) string {
+	decoder := xml.NewDecoder(strings.NewReader(xmlStr))
+	var buf bytes.Buffer
+	encoder := xml.NewEncoder(&buf)
+	encoder.Indent("", "  ")
+
+	for {
+		tok, err := decoder.Token()
+		if err != nil {
+			break
+		}
+		if err := encoder.EncodeToken(tok); err != nil {
+			return xmlStr
+		}
+	}
+	if err := encoder.Flush(); err != nil {
+		return xmlStr
+	}
+	result := buf.String()
+	if result == "" {
+		return xmlStr
+	}
+	return result
 }
