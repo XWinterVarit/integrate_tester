@@ -84,6 +84,8 @@ var (
 	IfRequestQuery           = dm.IfRequestQuery
 	IfRequestHeaderSetCase   = dm.IfRequestHeaderSetCase
 	IfRequestJsonBodySetCase = dm.IfRequestJsonBodySetCase
+	IfRequestXmlBody         = dm.IfRequestXmlBody
+	IfRequestXmlBodySetCase  = dm.IfRequestXmlBodySetCase
 	IfRequestPathSetCase     = dm.IfRequestPathSetCase
 	IfRequestQuerySetCase    = dm.IfRequestQuerySetCase
 
@@ -99,6 +101,7 @@ var (
 
 	ExtractRequestHeader   = dm.ExtractRequestHeader
 	ExtractRequestJsonBody = dm.ExtractRequestJsonBody
+	ExtractRequestXmlBody  = dm.ExtractRequestXmlBody
 	ExtractRequestPath     = dm.ExtractRequestPath
 	ExtractRequestQuery    = dm.ExtractRequestQuery
 
@@ -115,6 +118,7 @@ var (
 	Delete              = dm.Delete
 
 	SetJsonBody           = dm.SetJsonBody
+	SetXmlBody            = dm.SetXmlBody
 	SetStatusCode         = dm.SetStatusCode
 	SetWait               = dm.SetWait
 	SetRandomWait         = dm.SetRandomWait

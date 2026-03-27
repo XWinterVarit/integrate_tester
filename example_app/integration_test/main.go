@@ -165,6 +165,34 @@ func main() {
 		}
 	})
 
+	t.Stage("Complex Request (POST XML)", func() {
+		resp := v1.SendRESTRequest("http://localhost:8080/update-xml",
+			v1.WithMethod(http.MethodPost),
+			v1.WithXMLBody(struct {
+				XMLName struct{} `xml:"request"`
+				ID      string   `xml:"id"`
+				Status  string   `xml:"status"`
+			}{
+				ID:     "1",
+				Status: "xml-updated",
+			}),
+		)
+
+		v1.ExpectStatusCode(resp, 200)
+		v1.ExpectHeader(resp, "Content-Type", "application/xml")
+		v1.ExpectXmlBodyField(resp, "response.id", "1")
+		v1.ExpectXmlBodyField(resp, "response.status", "xml-updated")
+
+		// Pretty-print the XML response for readability
+		fmt.Println("XML Response (pretty):")
+		fmt.Println(v1.PrettyXml(resp.Body))
+
+		// Verify DB updated from POST XML call
+		result := db.Fetch("SELECT status FROM users WHERE id = ?", 1)
+		result.ExpectCount(1)
+		result.GetRow(0).Expect("status", "xml-updated")
+	})
+
 	t.Stage("Mock Server Example", func() {
 		// 1. Connect to the Mock Server
 		// The mock server must be running separately (e.g., via docker or separate process)
@@ -202,6 +230,75 @@ func main() {
 		if !strings.Contains(respVip.Body, "Hello VIP") {
 			v1.Fail("Expected VIP message, got: %s", respVip.Body)
 		}
+	})
+
+	t.Stage("Mock Server XML Example", func() {
+		// 1. Connect to the Mock Server
+		client := v1.NewDynamicMockClient(*mockUrl)
+
+		// 2. Register an XML Route with Case Routing
+		err := client.RegisterRoute(mockPort, "POST", "/mock-xml", []v1.ResponseFuncConfig{
+			// Extract a field from the XML request body
+			v1.ExtractRequestXmlBody("request.user.name", "USER_NAME"),
+
+			// Route based on XML body content
+			v1.IfRequestXmlBodySetCase("request.user.role", v1.ConditionEqual, "admin", "AdminCase"),
+
+			// Default Response (XML)
+			v1.SetStatusCode("", 200),
+			v1.SetHeader("", "Content-Type", "application/xml"),
+			v1.SetXmlBody("", `<response><message>Hello {{.USER_NAME}}</message><access>basic</access></response>`),
+
+			// Admin Response (XML)
+			v1.SetStatusCode("AdminCase", 200),
+			v1.SetHeader("AdminCase", "Content-Type", "application/xml"),
+			v1.SetXmlBody("AdminCase", `<response><message>Welcome Admin {{.USER_NAME}}</message><access>full</access></response>`),
+		})
+		v1.AssertNoError(err)
+
+		// 3. Verify Default Case (non-admin)
+		resp := v1.SendRESTRequest(fmt.Sprintf("http://localhost:%d/mock-xml", mockPort),
+			v1.WithMethod(http.MethodPost),
+			v1.WithXMLBody(struct {
+				XMLName struct{} `xml:"request"`
+				User    struct {
+					Name string `xml:"name"`
+					Role string `xml:"role"`
+				} `xml:"user"`
+			}{
+				User: struct {
+					Name string `xml:"name"`
+					Role string `xml:"role"`
+				}{Name: "Alice", Role: "viewer"},
+			}),
+		)
+		v1.ExpectStatusCode(resp, 200)
+		v1.ExpectXmlBodyField(resp, "response.access", "basic")
+		v1.ExpectXmlBodyField(resp, "response.message", "Hello Alice")
+
+		// 4. Verify Admin Case
+		respAdmin := v1.SendRESTRequest(fmt.Sprintf("http://localhost:%d/mock-xml", mockPort),
+			v1.WithMethod(http.MethodPost),
+			v1.WithXMLBody(struct {
+				XMLName struct{} `xml:"request"`
+				User    struct {
+					Name string `xml:"name"`
+					Role string `xml:"role"`
+				} `xml:"user"`
+			}{
+				User: struct {
+					Name string `xml:"name"`
+					Role string `xml:"role"`
+				}{Name: "Bob", Role: "admin"},
+			}),
+		)
+		v1.ExpectStatusCode(respAdmin, 200)
+		v1.ExpectXmlBodyField(respAdmin, "response.access", "full")
+		v1.ExpectXmlBodyField(respAdmin, "response.message", "Welcome Admin Bob")
+
+		// Pretty-print the admin XML response
+		fmt.Println("Mock XML Admin Response (pretty):")
+		fmt.Println(v1.PrettyXml(respAdmin.Body))
 	})
 
 	v1.RunCLICommand(t)
