@@ -7,10 +7,9 @@ type ExecuteQueryRequest struct {
 }
 
 type UpdateCellRequest struct {
-	Column   string `json:"column"`
-	Value    string `json:"value"`
-	WhereCol string `json:"where_column"`
-	WhereVal string `json:"where_value"`
+	Column string `json:"column"`
+	Value  string `json:"value"`
+	Rowid  string `json:"rowid"`
 }
 
 type ResolvePresetQueryRequest struct {

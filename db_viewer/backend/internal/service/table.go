@@ -125,15 +125,15 @@ func (s *TableService) UpdateCell(ctx context.Context, client, table string, req
 	if err != nil {
 		return err
 	}
-	return repo.UpdateCell(ctx, table, req.Column, req.Value, req.WhereCol, req.WhereVal)
+	return repo.UpdateCell(ctx, table, req.Column, req.Value, req.Rowid)
 }
 
-func (s *TableService) GetBlobData(ctx context.Context, client, table, column, whereCol, whereVal string) ([]byte, error) {
+func (s *TableService) GetBlobData(ctx context.Context, client, table, column, rowid string) ([]byte, error) {
 	repo, err := s.getRepo(client)
 	if err != nil {
 		return nil, err
 	}
-	return repo.GetBlobData(ctx, table, column, whereCol, whereVal)
+	return repo.GetBlobData(ctx, table, column, rowid)
 }
 
 func (s *TableService) GetFilters(client, table string) []model.PresetFilterResponse {

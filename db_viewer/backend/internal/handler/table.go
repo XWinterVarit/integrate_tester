@@ -107,15 +107,14 @@ func (h *TableHandler) DownloadBlob(w http.ResponseWriter, r *http.Request) {
 	table := r.PathValue("table")
 
 	column := r.URL.Query().Get("column")
-	whereCol := r.URL.Query().Get("where_column")
-	whereVal := r.URL.Query().Get("where_value")
+	rowid := r.URL.Query().Get("rowid")
 
-	if column == "" || whereCol == "" || whereVal == "" {
-		writeError(w, "missing column, where_column, or where_value", http.StatusBadRequest)
+	if column == "" || rowid == "" {
+		writeError(w, "missing column or rowid", http.StatusBadRequest)
 		return
 	}
 
-	data, err := h.svc.GetBlobData(r.Context(), client, table, column, whereCol, whereVal)
+	data, err := h.svc.GetBlobData(r.Context(), client, table, column, rowid)
 	if err != nil {
 		writeError(w, fmt.Sprintf("blob error: %v", err), http.StatusInternalServerError)
 		return

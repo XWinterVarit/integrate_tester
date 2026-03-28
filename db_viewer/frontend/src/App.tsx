@@ -116,7 +116,7 @@ const App: React.FC = () => {
       setColumnMeta(colData || []);
       setAllColumns(
         rowData && rowData.length > 0
-          ? Object.keys(rowData[0])
+          ? Object.keys(rowData[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns')
           : (colData || []).map((c: any) => c.COLUMN_NAME)
       );
       setFilters(filterData || []);
@@ -205,7 +205,7 @@ const App: React.FC = () => {
       const result = await api.executeQuery(selectedClient, selectedTable, { query, args, limit });
       setRows(result || []);
       if (result && result.length > 0) {
-        setAllColumns(Object.keys(result[0]));
+        setAllColumns(Object.keys(result[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns'));
       }
       api.touchRecentQuery(`${selectedClient}:${selectedTable}:preset`).catch(() => {});
     } catch (e: any) {
@@ -357,8 +357,7 @@ const App: React.FC = () => {
                 closeFloating(win.id);
                 setRows((prev) =>
                   prev.map((r) => {
-                    const firstCol = Object.keys(originalRow)[0];
-                    if (String(r[firstCol]) === String(originalRow[firstCol])) {
+                    if (r['ROWID'] && String(r['ROWID']) === String(originalRow['ROWID'])) {
                       return { ...r, [colName]: newValue };
                     }
                     return r;

@@ -61,13 +61,13 @@ export const api = {
     return `${BASE_URL}/api/clients/${client}/tables/${table}/export?${qs}`;
   },
 
-  updateCell: (client: string, table: string, body: { column: string; value: string; where_column: string; where_value: string }) =>
+  updateCell: (client: string, table: string, body: { column: string; value: string; rowid: string }) =>
     request<{ status: string }>(`/api/clients/${client}/tables/${table}/rows/update`, {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
 
-  blobDownloadUrl: (client: string, table: string, params: { column: string; where_column: string; where_value: string }) => {
+  blobDownloadUrl: (client: string, table: string, params: { column: string; rowid: string }) => {
     const qs = new URLSearchParams(params).toString();
     return `${BASE_URL}/api/clients/${client}/tables/${table}/blob?${qs}`;
   },

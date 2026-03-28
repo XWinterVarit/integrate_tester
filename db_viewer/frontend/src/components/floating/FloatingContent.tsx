@@ -91,12 +91,10 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
     setSaving(true);
     setMessage('');
     try {
-      const firstCol = Object.keys(row)[0];
       await api.updateCell(client, table, {
         column: columnName,
         value: editValue,
-        where_column: firstCol,
-        where_value: String(row[firstCol]),
+        rowid: String(row['ROWID'] || ''),
       });
       if (onSaved) {
         onSaved(columnName, editValue, row);
@@ -109,11 +107,9 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
   };
 
   const handleBlobDownload = () => {
-    const firstCol = Object.keys(row)[0];
     const url = api.blobDownloadUrl(client, table, {
       column: columnName,
-      where_column: firstCol,
-      where_value: String(row[firstCol]),
+      rowid: String(row['ROWID'] || ''),
     });
     window.open(url, '_blank');
   };

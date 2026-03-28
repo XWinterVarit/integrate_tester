@@ -26,7 +26,7 @@ func (r *OracleRepository) QueryRows(ctx context.Context, params model.RowQueryP
 		cols = params.Select
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s.%s", cols, r.schema, table)
+	query := fmt.Sprintf("SELECT ROWID, %s FROM %s.%s", cols, r.schema, table)
 
 	if params.Sort != "" {
 		dir := "ASC"
@@ -84,10 +84,10 @@ func (r *OracleRepository) GetTableSize(ctx context.Context, table string) ([]ma
 	return r.executeQueryWithArgs(ctx, query, []any{table})
 }
 
-func (r *OracleRepository) UpdateCell(ctx context.Context, table, column, value, whereCol, whereVal string) error {
-	query := fmt.Sprintf("UPDATE %s.%s SET %s = :1 WHERE %s = :2",
-		r.schema, table, column, whereCol)
-	_, err := r.db.ExecContext(ctx, query, value, whereVal)
+func (r *OracleRepository) UpdateCell(ctx context.Context, table, column, value, rowid string) error {
+	query := fmt.Sprintf("UPDATE %s.%s SET %s = :1 WHERE ROWID = :2",
+		r.schema, table, column)
+	_, err := r.db.ExecContext(ctx, query, value, rowid)
 	return err
 }
 
@@ -95,9 +95,9 @@ func (r *OracleRepository) ExportRows(ctx context.Context, query string) ([]map[
 	return r.executeQuery(ctx, query)
 }
 
-func (r *OracleRepository) GetBlobData(ctx context.Context, table, column, whereCol, whereVal string) ([]byte, error) {
-	query := fmt.Sprintf("SELECT %s FROM %s.%s WHERE %s = :1", column, r.schema, table, whereCol)
-	row := r.db.QueryRowContext(ctx, query, whereVal)
+func (r *OracleRepository) GetBlobData(ctx context.Context, table, column, rowid string) ([]byte, error) {
+	query := fmt.Sprintf("SELECT %s FROM %s.%s WHERE ROWID = :1", column, r.schema, table)
+	row := r.db.QueryRowContext(ctx, query, rowid)
 	var data []byte
 	if err := row.Scan(&data); err != nil {
 		return nil, err
