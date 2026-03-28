@@ -36,15 +36,33 @@ const Sidebar: React.FC<SidebarProps> = ({
               No tables configured
             </div>
           )}
-          {tables.map((t) => (
-            <div
-              key={t}
-              className={`sidebar-item ${selectedTable === t ? 'active' : ''}`}
-              onClick={() => onSelectTable(t)}
-            >
-              {t}
-            </div>
-          ))}
+          {tables.map((t, idx) => {
+            if (t === '<SPACE>') {
+              return <div key={`space-${idx}`} className="sidebar-space" />;
+            }
+            if (t.startsWith('<COMMENTARY>')) {
+              const label = t.replace('<COMMENTARY>', '').trim();
+              return (
+                <div key={`comment-${idx}`} className="sidebar-commentary">
+                  {label}
+                </div>
+              );
+            }
+            const tableUrl = `${window.location.pathname}?client=${encodeURIComponent(selectedClient)}&table=${encodeURIComponent(t)}`;
+            return (
+              <a
+                key={t}
+                href={tableUrl}
+                className={`sidebar-item ${selectedTable === t ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSelectTable(t);
+                }}
+              >
+                {t}
+              </a>
+            );
+          })}
         </>
       )}
     </div>

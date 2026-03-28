@@ -102,6 +102,30 @@ func (h *TableHandler) UpdateCell(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, model.StatusResponse{Status: "ok"})
 }
 
+func (h *TableHandler) DownloadBlob(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+
+	column := r.URL.Query().Get("column")
+	whereCol := r.URL.Query().Get("where_column")
+	whereVal := r.URL.Query().Get("where_value")
+
+	if column == "" || whereCol == "" || whereVal == "" {
+		writeError(w, "missing column, where_column, or where_value", http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.svc.GetBlobData(r.Context(), client, table, column, whereCol, whereVal)
+	if err != nil {
+		writeError(w, fmt.Sprintf("blob error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.bin"`, table, column))
+	w.Write(data)
+}
+
 func parseLimit(s string, defaultVal int) int {
 	if s == "" {
 		return defaultVal

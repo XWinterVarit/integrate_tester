@@ -11,6 +11,7 @@ clients:
     service: "XE"
     schema: "LEARN1"
     tables:
+      - name: "<COMMENTARY> CRM"
       # ── CUSTOMERS: 12 rows, 13 columns, CLOB, DATE, CHECK constraints ──
       - name: "CUSTOMERS"
         preset_filters:
@@ -120,6 +121,8 @@ clients:
                 type: "number"
                 description: "Stock quantity threshold"
 
+      - name: "<SPACE>"
+      - name: "<COMMENTARY> Sales"
       # ── ORDERS: 20 rows, 11 columns, FKs to CUSTOMERS & PRODUCTS, virtual column ──
       - name: "ORDERS"
         preset_filters:
@@ -177,6 +180,8 @@ clients:
                 type: "number"
                 description: "Minimum order total amount"
 
+      - name: "<SPACE>"
+      - name: "<COMMENTARY> HR"
       # ── EMPLOYEES: 10 rows, self-referencing FK (MANAGER_ID) ──
       - name: "EMPLOYEES"
         preset_filters:
@@ -231,6 +236,8 @@ clients:
                 type: "string"
                 description: "Y for active, N for inactive"
 
+      - name: "<SPACE>"
+      - name: "<COMMENTARY> Reference"
       # ── CATEGORIES: 6 rows, small lookup table ──
       - name: "CATEGORIES"
         preset_filters: []
@@ -242,6 +249,8 @@ clients:
                 type: "string"
                 description: "Y for active, N for inactive"
 
+      - name: "<SPACE>"
+      - name: "<COMMENTARY> System"
       # ── AUDIT_LOG: 8 rows, CLOB columns, good for transpose view testing ──
       - name: "AUDIT_LOG"
         preset_filters:
@@ -274,3 +283,140 @@ clients:
               - name: "USER_NAME"
                 type: "string"
                 description: "Username who made the change (e.g. admin, SYSTEM)"
+
+  # ── Second client: Sales team view (subset of tables) ──
+  - name: "sales_team"
+    user: "LEARN1"
+    password: "Welcome"
+    host: "localhost"
+    port: 1521
+    service: "XE"
+    schema: "LEARN1"
+    tables:
+      - name: "CUSTOMERS"
+        preset_filters:
+          - name: "Sales Contact"
+            details: "Customer contact info for sales outreach"
+            columns:
+              - "CUSTOMER_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "EMAIL"
+              - "PHONE"
+              - "<SPACE>"
+              - "<COMMENTARY> Membership"
+              - "MEMBERSHIP"
+              - "CREDIT_LIMIT"
+        preset_queries:
+          - name: "Gold & Platinum"
+            query: "SELECT * FROM {THIS_TABLE} WHERE MEMBERSHIP IN ('GOLD', 'PLATINUM') ORDER BY CREDIT_LIMIT DESC"
+            arguments: []
+          - name: "By Country"
+            query: "SELECT * FROM {THIS_TABLE} WHERE COUNTRY = :COUNTRY ORDER BY LAST_NAME"
+            arguments:
+              - name: "COUNTRY"
+                type: "string"
+                description: "Country code (e.g. USA, UK, Japan)"
+
+      - name: "ORDERS"
+        preset_filters:
+          - name: "Sales Pipeline"
+            details: "Order status and financials"
+            columns:
+              - "ORDER_ID"
+              - "CUSTOMER_ID"
+              - "STATUS"
+              - "<SPACE>"
+              - "<COMMENTARY> Revenue"
+              - "QUANTITY"
+              - "UNIT_PRICE"
+              - "TOTAL_AMOUNT"
+              - "ORDER_DATE"
+        preset_queries:
+          - name: "Pending Orders"
+            query: "SELECT * FROM {THIS_TABLE} WHERE STATUS IN ('PENDING', 'CONFIRMED') ORDER BY ORDER_DATE DESC"
+            arguments: []
+          - name: "Revenue Above"
+            query: "SELECT * FROM {THIS_TABLE} WHERE QUANTITY * UNIT_PRICE >= :MIN_TOTAL ORDER BY QUANTITY * UNIT_PRICE DESC"
+            arguments:
+              - name: "MIN_TOTAL"
+                type: "number"
+                description: "Minimum order total"
+
+      - name: "PRODUCTS"
+        preset_filters:
+          - name: "Price List"
+            details: "Product pricing for quotes"
+            columns:
+              - "PRODUCT_ID"
+              - "PRODUCT_NAME"
+              - "SKU"
+              - "PRICE"
+              - "IS_AVAILABLE"
+        preset_queries:
+          - name: "Available Products"
+            query: "SELECT * FROM {THIS_TABLE} WHERE IS_AVAILABLE = 'Y' ORDER BY PRODUCT_NAME"
+            arguments: []
+
+  # ── Third client: HR view (subset of tables) ──
+  - name: "hr_team"
+    user: "LEARN1"
+    password: "Welcome"
+    host: "localhost"
+    port: 1521
+    service: "XE"
+    schema: "LEARN1"
+    tables:
+      - name: "EMPLOYEES"
+        preset_filters:
+          - name: "HR Directory"
+            details: "Full employee directory for HR"
+            columns:
+              - "EMPLOYEE_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "EMAIL"
+              - "PHONE"
+              - "<SPACE>"
+              - "<COMMENTARY> Employment"
+              - "DEPARTMENT"
+              - "JOB_TITLE"
+              - "SALARY"
+              - "HIRE_DATE"
+              - "IS_ACTIVE"
+              - "<SPACE>"
+              - "<COMMENTARY> Reporting"
+              - "MANAGER_ID"
+        preset_queries:
+          - name: "By Department"
+            query: "SELECT * FROM {THIS_TABLE} WHERE DEPARTMENT = :DEPT ORDER BY LAST_NAME"
+            arguments:
+              - name: "DEPT"
+                type: "string"
+                description: "Department name (Engineering, Sales, HR, Finance)"
+          - name: "New Hires (After Date)"
+            query: "SELECT * FROM {THIS_TABLE} WHERE HIRE_DATE >= TO_DATE(:AFTER_DATE, 'YYYY-MM-DD') ORDER BY HIRE_DATE DESC"
+            arguments:
+              - name: "AFTER_DATE"
+                type: "string"
+                description: "Date (YYYY-MM-DD)"
+          - name: "Inactive Employees"
+            query: "SELECT * FROM {THIS_TABLE} WHERE IS_ACTIVE = 'N'"
+            arguments: []
+
+      - name: "AUDIT_LOG"
+        preset_filters:
+          - name: "Employee Changes"
+            details: "Audit trail for employee records"
+            columns:
+              - "LOG_ID"
+              - "TABLE_NAME"
+              - "OPERATION"
+              - "RECORD_ID"
+              - "CHANGED_BY"
+              - "CHANGED_AT"
+              - "<THE REST>"
+        preset_queries:
+          - name: "Employee Audits"
+            query: "SELECT * FROM {THIS_TABLE} WHERE TABLE_NAME = 'EMPLOYEES' ORDER BY CHANGED_AT DESC"
+            arguments: []

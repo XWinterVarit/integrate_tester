@@ -67,6 +67,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  blobDownloadUrl: (client: string, table: string, params: { column: string; where_column: string; where_value: string }) => {
+    const qs = new URLSearchParams(params).toString();
+    return `${BASE_URL}/api/clients/${client}/tables/${table}/blob?${qs}`;
+  },
+
   touchRecentFilter: (key: string) =>
     request<{ status: string }>('/api/recent/filter', {
       method: 'POST',

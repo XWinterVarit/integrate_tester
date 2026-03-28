@@ -13,41 +13,14 @@ interface ColumnInfoContentProps {
   columnName: string;
   columnMeta: Record<string, any> | null;
   constraints: Record<string, any>[];
-  client: string;
-  table: string;
-  row: Record<string, any> | null;
 }
 
 export const ColumnInfoContent: React.FC<ColumnInfoContentProps> = ({
-  columnName, columnMeta, constraints, client, table, row,
+  columnName, columnMeta, constraints,
 }) => {
-  const [editValue, setEditValue] = useState(row ? String(row[columnName] ?? '') : '');
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-
   const relatedConstraints = constraints.filter(
     (c) => String(c.COLUMNS || '').split(',').map((s: string) => s.trim()).includes(columnName)
   );
-
-  const handleSave = async () => {
-    if (!row) return;
-    setSaving(true);
-    setMessage('');
-    try {
-      const firstCol = Object.keys(row)[0];
-      await api.updateCell(client, table, {
-        column: columnName,
-        value: editValue,
-        where_column: firstCol,
-        where_value: String(row[firstCol]),
-      });
-      setMessage('Saved successfully');
-    } catch (e: any) {
-      setMessage(`Error: ${e.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div>
@@ -91,28 +64,113 @@ export const ColumnInfoContent: React.FC<ColumnInfoContentProps> = ({
           ))}
         </div>
       )}
+    </div>
+  );
+};
 
-      {row && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-            Edit Value
+interface FieldEditContentProps {
+  columnName: string;
+  value: any;
+  client: string;
+  table: string;
+  row: Record<string, any>;
+  onSaved?: (columnName: string, newValue: string, row: Record<string, any>) => void;
+}
+
+export const FieldEditContent: React.FC<FieldEditContentProps> = ({
+  columnName, value, client, table, row, onSaved,
+}) => {
+  const [editValue, setEditValue] = useState(String(value ?? ''));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const blobCols: string[] = row['__blob_columns'] || [];
+  const isBlob = blobCols.includes(columnName);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage('');
+    try {
+      const firstCol = Object.keys(row)[0];
+      await api.updateCell(client, table, {
+        column: columnName,
+        value: editValue,
+        where_column: firstCol,
+        where_value: String(row[firstCol]),
+      });
+      if (onSaved) {
+        onSaved(columnName, editValue, row);
+      }
+    } catch (e: any) {
+      setMessage(`Error: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBlobDownload = () => {
+    const firstCol = Object.keys(row)[0];
+    const url = api.blobDownloadUrl(client, table, {
+      column: columnName,
+      where_column: firstCol,
+      where_value: String(row[firstCol]),
+    });
+    window.open(url, '_blank');
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Column
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>
+          {columnName}
+          {isBlob && <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8 }}>(BLOB)</span>}
+        </div>
+      </div>
+      {isBlob ? (
+        <div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+              Preview (truncated)
+            </div>
+            <div style={{
+              fontFamily: 'monospace', fontSize: 12, padding: 8,
+              background: 'var(--bg-secondary, #f5f5f5)', borderRadius: 4,
+              wordBreak: 'break-all', maxHeight: 120, overflow: 'auto',
+            }}>
+              {String(value ?? '')}
+            </div>
           </div>
-          <input
-            className="edit-cell-input"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-          />
-          <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={handleBlobDownload} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⬇ Download BLOB
+          </button>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+              Value
+            </div>
+            <textarea
+              className="edit-cell-input"
+              style={{ width: '100%', minHeight: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </button>
             {message && (
-              <span style={{ fontSize: 12, color: message.startsWith('Error') ? 'var(--danger)' : 'var(--success)' }}>
+              <span style={{ fontSize: 12, color: 'var(--danger)' }}>
                 {message}
               </span>
             )}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -144,17 +202,18 @@ export const TableInfoContent: React.FC<TableInfoContentProps> = ({ size, constr
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
-          Constraints
-        </div>
-        {constraints.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>None</div>
-        ) : (
+      {constraints.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+            Constraints
+          </div>
           <table className="data-table" style={{ fontSize: 12 }}>
             <thead>
               <tr>
-                <th>Name</th><th>Type</th><th>Columns</th><th>Status</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Columns</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -168,20 +227,21 @@ export const TableInfoContent: React.FC<TableInfoContentProps> = ({ size, constr
               ))}
             </tbody>
           </table>
-        )}
-      </div>
-
-      <div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
-          Indexes
         </div>
-        {indexes.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>None</div>
-        ) : (
+      )}
+
+      {indexes.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+            Indexes
+          </div>
           <table className="data-table" style={{ fontSize: 12 }}>
             <thead>
               <tr>
-                <th>Name</th><th>Type</th><th>Unique</th><th>Columns</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Uniqueness</th>
+                <th>Columns</th>
               </tr>
             </thead>
             <tbody>
@@ -195,8 +255,8 @@ export const TableInfoContent: React.FC<TableInfoContentProps> = ({ size, constr
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

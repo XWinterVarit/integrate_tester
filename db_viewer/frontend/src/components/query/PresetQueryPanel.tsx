@@ -3,16 +3,24 @@ import { PresetQuery } from '../../types';
 
 interface PresetQueryPanelProps {
   presets: PresetQuery[];
+  table: string;
   onExecute: (query: string, args: Record<string, string>) => void;
 }
 
-const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, onExecute }) => {
+const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, onExecute }) => {
+  const defaultQuery: PresetQuery = {
+    index: -1,
+    name: 'Select All',
+    query: `SELECT * FROM ${table}`,
+    arguments: [],
+  };
+  const allPresets = [defaultQuery, ...presets];
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<PresetQuery | null>(null);
   const [argValues, setArgValues] = useState<Record<string, string>>({});
 
-  const filtered = presets.filter(
+  const filtered = allPresets.filter(
     (p) => p.name.toLowerCase().includes(search.toLowerCase())
   );
 

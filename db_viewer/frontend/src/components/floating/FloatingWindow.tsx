@@ -53,12 +53,15 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
 
   const handlePopOut = () => {
     const content = document.getElementById(`floating-body-${win.id}`)?.innerHTML || '';
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(el => el.outerHTML)
+      .join('\n');
     const popup = window.open('', '_blank', `width=${size.w},height=${size.h},left=${pos.x},top=${pos.y}`);
     if (popup) {
       popup.document.write(`
         <!DOCTYPE html><html><head><title>${win.title}</title>
-        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:16px;font-size:13px;color:#1d1d1f;}
-        pre{white-space:pre-wrap;word-break:break-all;font-family:'SF Mono',Menlo,monospace;font-size:12px;}</style>
+        ${styles}
+        <style>body{margin:0;padding:16px;}</style>
         </head><body>${content}</body></html>
       `);
       popup.document.close();

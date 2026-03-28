@@ -26,6 +26,7 @@ func NewRouter(svc *service.TableService) *http.ServeMux {
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/indexes", tableH.GetIndexes)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/size", tableH.GetSize)
 	mux.HandleFunc("PUT /api/clients/{client}/tables/{table}/rows/update", tableH.UpdateCell)
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/blob", tableH.DownloadBlob)
 
 	// Query routes
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/query", queryH.Execute)
