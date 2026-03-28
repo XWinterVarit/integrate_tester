@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/XWinterVarit/integrate_tester/db_viewer/backend/internal/model"
 )
@@ -105,16 +106,64 @@ func (r *OracleRepository) DeleteRow(ctx context.Context, table, rowid string) e
 	return err
 }
 
+// isoDateFormats lists common ISO date/timestamp formats returned by Oracle via go-ora.
+var isoDateFormats = []string{
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02T15:04:05Z",
+	"2006-01-02T15:04:05",
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+}
+
+// parseISODate tries to parse s as an ISO date/timestamp and returns a time.Time if successful.
+func parseISODate(s string) (time.Time, bool) {
+	for _, layout := range isoDateFormats {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns, values []string) error {
-	placeholders := make([]string, len(columns))
-	args := make([]any, len(values))
-	for i := range columns {
+	// Fetch virtual columns for this table so we can skip them in the INSERT.
+	virtualCols := map[string]bool{}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :1 AND VIRTUAL_COLUMN = 'YES'`,
+		table)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var col string
+			if rows.Scan(&col) == nil {
+				virtualCols[col] = true
+			}
+		}
+	}
+
+	filteredCols := make([]string, 0, len(columns))
+	filteredVals := make([]any, 0, len(values))
+	for i, col := range columns {
+		if virtualCols[col] {
+			continue
+		}
+		filteredCols = append(filteredCols, col)
+		// Try to parse ISO date/timestamp strings so go-ora binds them correctly.
+		if t, ok := parseISODate(values[i]); ok {
+			filteredVals = append(filteredVals, t)
+		} else {
+			filteredVals = append(filteredVals, values[i])
+		}
+	}
+
+	placeholders := make([]string, len(filteredCols))
+	for i := range filteredCols {
 		placeholders[i] = fmt.Sprintf(":%d", i+1)
-		args[i] = values[i]
 	}
 	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)",
-		r.schema, table, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
-	_, err := r.db.ExecContext(ctx, query, args...)
+		r.schema, table, strings.Join(filteredCols, ", "), strings.Join(placeholders, ", "))
+	_, err = r.db.ExecContext(ctx, query, filteredVals...)
 	return err
 }
 

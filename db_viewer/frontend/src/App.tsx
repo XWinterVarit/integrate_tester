@@ -335,7 +335,7 @@ const App: React.FC = () => {
               onSelectColsChange={setSelectCols}
               onSortColChange={setSortCol}
               onSortDirChange={setSortDir}
-              onLimitChange={(v: number) => { setLimit(v); setCurrentPage(1); }}
+              onLimitChange={(v: number) => { setLimit(v > 0 ? v : 100); setCurrentPage(1); }}
               onViewModeChange={setViewMode}
               onRefresh={loadTableData}
               onShowTableInfo={handleShowTableInfo}
@@ -354,12 +354,12 @@ const App: React.FC = () => {
                 onExecute={handlePresetExecute}
                 onClear={() => { setActivePresetQuery(null); setActivePresetArgs({}); }}
               />
-              <button onClick={handleInsertNew}>➕ Insert</button>
               <ExportButton
                 client={selectedClient}
                 table={selectedTable}
                 queryParams={queryParams}
               />
+              <button className="secondary" style={{ marginLeft: 'auto' }} onClick={handleInsertNew}>➕ Insert</button>
               {totalPages > 1 && (
                 <div className="pagination-bar">
                   <button disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>«</button>
@@ -470,7 +470,7 @@ const App: React.FC = () => {
               client={selectedClient}
               table={selectedTable}
               columnMeta={columnMeta as any}
-              columns={visibleColumns}
+              columns={allColumns}
               prefillRow={win.content.prefillRow}
               onInserted={() => {
                 closeFloating(win.id);
