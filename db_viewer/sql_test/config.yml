@@ -1,0 +1,276 @@
+server:
+  port: 8080
+  cors_origin: "http://localhost:3000"
+
+clients:
+  - name: "local_test"
+    user: "LEARN1"
+    password: "Welcome"
+    host: "localhost"
+    port: 1521
+    service: "XE"
+    schema: "LEARN1"
+    tables:
+      # ── CUSTOMERS: 12 rows, 13 columns, CLOB, DATE, CHECK constraints ──
+      - name: "CUSTOMERS"
+        preset_filters:
+          - name: "Personal Info"
+            details: "Name, contact and location details"
+            columns:
+              - "CUSTOMER_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "<SPACE>"
+              - "<COMMENTARY> Contact"
+              - "EMAIL"
+              - "PHONE"
+              - "<SPACE>"
+              - "<COMMENTARY> Location"
+              - "CITY"
+              - "COUNTRY"
+              - "<THE REST>"
+          - name: "Membership & Credit"
+            details: "Membership tier and credit limit overview"
+            columns:
+              - "CUSTOMER_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "<SPACE>"
+              - "<COMMENTARY> Membership Details"
+              - "MEMBERSHIP"
+              - "CREDIT_LIMIT"
+              - "REGISTERED_AT"
+              - "<THE REST>"
+        preset_queries:
+          - name: "Search by Name"
+            query: "SELECT * FROM {THIS_TABLE} WHERE UPPER(FIRST_NAME) LIKE '%' || UPPER(:NAME) || '%' OR UPPER(LAST_NAME) LIKE '%' || UPPER(:NAME) || '%'"
+            arguments:
+              - name: "NAME"
+                type: "string"
+                description: "Enter first or last name to search"
+          - name: "By Country"
+            query: "SELECT * FROM {THIS_TABLE} WHERE COUNTRY = :COUNTRY ORDER BY LAST_NAME"
+            arguments:
+              - name: "COUNTRY"
+                type: "string"
+                description: "Country code (e.g. USA, UK, Japan)"
+          - name: "High Credit Customers"
+            query: "SELECT * FROM {THIS_TABLE} WHERE CREDIT_LIMIT >= :MIN_CREDIT ORDER BY CREDIT_LIMIT DESC"
+            arguments:
+              - name: "MIN_CREDIT"
+                type: "number"
+                description: "Minimum credit limit"
+          - name: "By Membership Tier"
+            query: "SELECT * FROM {THIS_TABLE} WHERE MEMBERSHIP = :TIER"
+            arguments:
+              - name: "TIER"
+                type: "string"
+                description: "STANDARD, SILVER, GOLD, or PLATINUM"
+
+      # ── PRODUCTS: 15 rows, 11 columns, FK to CATEGORIES ──
+      - name: "PRODUCTS"
+        preset_filters:
+          - name: "Catalog View"
+            details: "Product name, SKU, price and availability"
+            columns:
+              - "PRODUCT_ID"
+              - "PRODUCT_NAME"
+              - "SKU"
+              - "<SPACE>"
+              - "<COMMENTARY> Pricing & Stock"
+              - "PRICE"
+              - "STOCK_QTY"
+              - "IS_AVAILABLE"
+              - "<THE REST>"
+          - name: "Logistics"
+            details: "Weight and category for shipping"
+            columns:
+              - "PRODUCT_ID"
+              - "PRODUCT_NAME"
+              - "CATEGORY_ID"
+              - "WEIGHT_KG"
+              - "STOCK_QTY"
+              - "<THE REST>"
+        preset_queries:
+          - name: "Search by Product Name"
+            query: "SELECT * FROM {THIS_TABLE} WHERE UPPER(PRODUCT_NAME) LIKE '%' || UPPER(:KEYWORD) || '%'"
+            arguments:
+              - name: "KEYWORD"
+                type: "string"
+                description: "Keyword to search in product name"
+          - name: "By Category"
+            query: "SELECT * FROM {THIS_TABLE} WHERE CATEGORY_ID = :CAT_ID ORDER BY PRODUCT_NAME"
+            arguments:
+              - name: "CAT_ID"
+                type: "number"
+                description: "Category ID (1=Electronics, 2=Books, 3=Clothing, 4=Home, 5=Sports, 6=Discontinued)"
+          - name: "Price Range"
+            query: "SELECT * FROM {THIS_TABLE} WHERE PRICE BETWEEN :MIN_PRICE AND :MAX_PRICE ORDER BY PRICE"
+            arguments:
+              - name: "MIN_PRICE"
+                type: "number"
+                description: "Minimum price"
+              - name: "MAX_PRICE"
+                type: "number"
+                description: "Maximum price"
+          - name: "Low Stock Alert"
+            query: "SELECT * FROM {THIS_TABLE} WHERE STOCK_QTY <= :THRESHOLD AND IS_AVAILABLE = 'Y' ORDER BY STOCK_QTY"
+            arguments:
+              - name: "THRESHOLD"
+                type: "number"
+                description: "Stock quantity threshold"
+
+      # ── ORDERS: 20 rows, 11 columns, FKs to CUSTOMERS & PRODUCTS, virtual column ──
+      - name: "ORDERS"
+        preset_filters:
+          - name: "Order Summary"
+            details: "Key order fields at a glance"
+            columns:
+              - "ORDER_ID"
+              - "CUSTOMER_ID"
+              - "PRODUCT_ID"
+              - "<SPACE>"
+              - "<COMMENTARY> Financials"
+              - "QUANTITY"
+              - "UNIT_PRICE"
+              - "TOTAL_AMOUNT"
+              - "<SPACE>"
+              - "<COMMENTARY> Status"
+              - "STATUS"
+              - "ORDER_DATE"
+              - "<THE REST>"
+          - name: "Shipping"
+            details: "Shipping and delivery tracking"
+            columns:
+              - "ORDER_ID"
+              - "STATUS"
+              - "ORDER_DATE"
+              - "SHIPPED_DATE"
+              - "DELIVERY_NOTE"
+              - "<THE REST>"
+        preset_queries:
+          - name: "By Status"
+            query: "SELECT * FROM {THIS_TABLE} WHERE STATUS = :STATUS ORDER BY ORDER_DATE DESC"
+            arguments:
+              - name: "STATUS"
+                type: "string"
+                description: "PENDING, CONFIRMED, SHIPPED, DELIVERED, or CANCELLED"
+          - name: "By Customer"
+            query: "SELECT * FROM {THIS_TABLE} WHERE CUSTOMER_ID = :CUST_ID ORDER BY ORDER_DATE DESC"
+            arguments:
+              - name: "CUST_ID"
+                type: "number"
+                description: "Customer ID"
+          - name: "Date Range"
+            query: "SELECT * FROM {THIS_TABLE} WHERE ORDER_DATE BETWEEN TO_DATE(:FROM_DATE, 'YYYY-MM-DD') AND TO_DATE(:TO_DATE, 'YYYY-MM-DD') ORDER BY ORDER_DATE"
+            arguments:
+              - name: "FROM_DATE"
+                type: "string"
+                description: "Start date (YYYY-MM-DD)"
+              - name: "TO_DATE"
+                type: "string"
+                description: "End date (YYYY-MM-DD)"
+          - name: "Large Orders"
+            query: "SELECT * FROM {THIS_TABLE} WHERE QUANTITY * UNIT_PRICE >= :MIN_TOTAL ORDER BY QUANTITY * UNIT_PRICE DESC"
+            arguments:
+              - name: "MIN_TOTAL"
+                type: "number"
+                description: "Minimum order total amount"
+
+      # ── EMPLOYEES: 10 rows, self-referencing FK (MANAGER_ID) ──
+      - name: "EMPLOYEES"
+        preset_filters:
+          - name: "Directory"
+            details: "Employee contact directory"
+            columns:
+              - "EMPLOYEE_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "<SPACE>"
+              - "<COMMENTARY> Contact"
+              - "EMAIL"
+              - "PHONE"
+              - "<SPACE>"
+              - "<COMMENTARY> Role"
+              - "DEPARTMENT"
+              - "JOB_TITLE"
+              - "<THE REST>"
+          - name: "Compensation"
+            details: "Salary and hire date for review"
+            columns:
+              - "EMPLOYEE_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "SALARY"
+              - "HIRE_DATE"
+              - "IS_ACTIVE"
+              - "<THE REST>"
+        preset_queries:
+          - name: "By Department"
+            query: "SELECT * FROM {THIS_TABLE} WHERE DEPARTMENT = :DEPT ORDER BY LAST_NAME"
+            arguments:
+              - name: "DEPT"
+                type: "string"
+                description: "Department name (Engineering, Sales, HR, Finance)"
+          - name: "Salary Above"
+            query: "SELECT * FROM {THIS_TABLE} WHERE SALARY >= :MIN_SAL ORDER BY SALARY DESC"
+            arguments:
+              - name: "MIN_SAL"
+                type: "number"
+                description: "Minimum salary"
+          - name: "Direct Reports"
+            query: "SELECT * FROM {THIS_TABLE} WHERE MANAGER_ID = :MGR_ID ORDER BY LAST_NAME"
+            arguments:
+              - name: "MGR_ID"
+                type: "number"
+                description: "Manager's Employee ID"
+          - name: "Active Only"
+            query: "SELECT * FROM {THIS_TABLE} WHERE IS_ACTIVE = :ACTIVE"
+            arguments:
+              - name: "ACTIVE"
+                type: "string"
+                description: "Y for active, N for inactive"
+
+      # ── CATEGORIES: 6 rows, small lookup table ──
+      - name: "CATEGORIES"
+        preset_filters: []
+        preset_queries:
+          - name: "Active Categories"
+            query: "SELECT * FROM {THIS_TABLE} WHERE IS_ACTIVE = :ACTIVE ORDER BY CATEGORY_NAME"
+            arguments:
+              - name: "ACTIVE"
+                type: "string"
+                description: "Y for active, N for inactive"
+
+      # ── AUDIT_LOG: 8 rows, CLOB columns, good for transpose view testing ──
+      - name: "AUDIT_LOG"
+        preset_filters:
+          - name: "Change Summary"
+            details: "Quick view of what changed"
+            columns:
+              - "LOG_ID"
+              - "TABLE_NAME"
+              - "OPERATION"
+              - "RECORD_ID"
+              - "CHANGED_BY"
+              - "CHANGED_AT"
+              - "<THE REST>"
+        preset_queries:
+          - name: "By Table"
+            query: "SELECT * FROM {THIS_TABLE} WHERE TABLE_NAME = :TBL ORDER BY CHANGED_AT DESC"
+            arguments:
+              - name: "TBL"
+                type: "string"
+                description: "Table name (CUSTOMERS, PRODUCTS, ORDERS, EMPLOYEES)"
+          - name: "By Operation"
+            query: "SELECT * FROM {THIS_TABLE} WHERE OPERATION = :OP ORDER BY CHANGED_AT DESC"
+            arguments:
+              - name: "OP"
+                type: "string"
+                description: "INSERT, UPDATE, or DELETE"
+          - name: "By User"
+            query: "SELECT * FROM {THIS_TABLE} WHERE CHANGED_BY = :USER_NAME ORDER BY CHANGED_AT DESC"
+            arguments:
+              - name: "USER_NAME"
+                type: "string"
+                description: "Username who made the change (e.g. admin, SYSTEM)"

@@ -1,0 +1,109 @@
+import React, { useState } from 'react';
+import { PresetQuery } from '../../types';
+
+interface PresetQueryPanelProps {
+  presets: PresetQuery[];
+  onExecute: (query: string, args: Record<string, string>) => void;
+}
+
+const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, onExecute }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<PresetQuery | null>(null);
+  const [argValues, setArgValues] = useState<Record<string, string>>({});
+
+  const filtered = presets.filter(
+    (p) => p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSelect = (preset: PresetQuery) => {
+    setSelected(preset);
+    setOpen(false);
+    const defaults: Record<string, string> = {};
+    preset.arguments.forEach((a) => { defaults[a.name] = ''; });
+    setArgValues(defaults);
+  };
+
+  const getFinalQuery = () => {
+    if (!selected) return '';
+    let q = selected.query;
+    for (const [key, val] of Object.entries(argValues)) {
+      q = q.replace(new RegExp(`:${key}`, 'g'), `'${val}'`);
+    }
+    return q;
+  };
+
+  const handleExecute = () => {
+    if (!selected) return;
+    onExecute(selected.query, argValues);
+    setSelected(null);
+  };
+
+  return (
+    <div>
+      <div className="preset-dropdown" style={{ display: 'inline-block' }}>
+        <button className="secondary" onClick={() => setOpen(!open)}>
+          Preset Queries
+        </button>
+        {open && (
+          <div className="preset-dropdown-menu">
+            <input
+              className="search-input"
+              placeholder="Search presets..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+            {filtered.map((p) => (
+              <div
+                key={p.index}
+                className="preset-dropdown-item"
+                onClick={() => handleSelect(p)}
+              >
+                {p.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selected && (
+        <div className="preset-query-panel" style={{ marginTop: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>{selected.name}</div>
+
+          {selected.arguments.length > 0 && (
+            <div className="args-section">
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Edit Parameters
+              </div>
+              {selected.arguments.map((arg) => (
+                <div key={arg.name} className="arg-row">
+                  <label>{arg.name} ({arg.type})</label>
+                  <input
+                    value={argValues[arg.name] || ''}
+                    onChange={(e) => setArgValues({ ...argValues, [arg.name]: e.target.value })}
+                    placeholder={arg.description}
+                    style={{ flex: 1 }}
+                  />
+                  <span className="arg-desc">{arg.description}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginTop: 12 }}>
+            Final Query Preview
+          </div>
+          <div className="final-query">{getFinalQuery()}</div>
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button onClick={handleExecute}>Execute</button>
+            <button className="secondary" onClick={() => setSelected(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PresetQueryPanel;

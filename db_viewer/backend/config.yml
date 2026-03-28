@@ -1,0 +1,60 @@
+server:
+  port: 8080
+  cors_origin: "http://localhost:3000"
+
+clients:
+  - name: "client1"
+    user: "your_user"
+    password: "your_password"
+    host: "localhost"
+    port: 1521
+    service: "ORCL"
+    schema: "YOUR_SCHEMA"
+    tables:
+      - name: "EMPLOYEES"
+        preset_filters:
+          - name: "Personal Info"
+            details: "View personal information columns"
+            columns:
+              - "EMPLOYEE_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "<SPACE>"
+              - "<COMMENTARY> Contact Information"
+              - "EMAIL"
+              - "PHONE_NUMBER"
+              - "<SPACE>"
+              - "<COMMENTARY> Job Details"
+              - "JOB_ID"
+              - "SALARY"
+              - "<THE REST>"
+          - name: "Salary Review"
+            details: "Columns for salary review"
+            columns:
+              - "EMPLOYEE_ID"
+              - "FIRST_NAME"
+              - "LAST_NAME"
+              - "SALARY"
+              - "COMMISSION_PCT"
+        preset_queries:
+          - name: "Search by Name"
+            query: "SELECT * FROM {THIS_TABLE} WHERE FIRST_NAME LIKE '%' || :NAME || '%'"
+            arguments:
+              - name: "NAME"
+                type: "string"
+                description: "Enter employee first name to search"
+          - name: "High Salary"
+            query: "SELECT * FROM {THIS_TABLE} WHERE SALARY > :MIN_SALARY ORDER BY SALARY DESC"
+            arguments:
+              - name: "MIN_SALARY"
+                type: "number"
+                description: "Minimum salary threshold"
+      - name: "DEPARTMENTS"
+        preset_filters: []
+        preset_queries:
+          - name: "Search by Department"
+            query: "SELECT * FROM {THIS_TABLE} WHERE DEPARTMENT_NAME LIKE '%' || :DEPT_NAME || '%'"
+            arguments:
+              - name: "DEPT_NAME"
+                type: "string"
+                description: "Enter department name to search"
