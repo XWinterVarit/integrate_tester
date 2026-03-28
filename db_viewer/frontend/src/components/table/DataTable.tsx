@@ -1,13 +1,24 @@
 import React, { useState, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Row } from '../../types';
 import { FilteredColumn } from '../../utils/filterColumns';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
+
+interface TooltipState {
+  meta: Record<string, any>;
+  colName: string;
+  x: number;
+  y: number;
+}
 
 interface DataTableProps {
   rows: Row[];
   columns: string[];
   filterItems: FilteredColumn[] | null;
   pageOffset: number;
+  columnMeta?: Record<string, any>[];
+  sortCol?: string;
+  sortDir?: string;
   onRowClick: (row: Row) => void;
   onColumnClick: (colName: string) => void;
   onSortClick: (colName: string) => void;
@@ -17,7 +28,7 @@ interface DataTableProps {
 }
 
 const DataTable: React.FC<DataTableProps> = ({
-  rows, columns, filterItems, pageOffset, onRowClick, onColumnClick, onSortClick, onFieldClick, onDeleteRow, onCloneRow,
+  rows, columns, filterItems, pageOffset, columnMeta, sortCol, sortDir, onRowClick, onColumnClick, onSortClick, onFieldClick, onDeleteRow, onCloneRow,
 }) => {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
@@ -25,6 +36,14 @@ const DataTable: React.FC<DataTableProps> = ({
   const { scrollRef, wrapperClass } = useScrollShadow();
   const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const handleThMouseEnter = useCallback((e: React.MouseEvent, meta: Record<string, any>, colName: string) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTooltip({ meta, colName, x: rect.left, y: rect.bottom + 4 });
+  }, []);
+
+  const handleThMouseLeave = useCallback(() => setTooltip(null), []);
 
   const handleResizeStart = useCallback((e: React.MouseEvent, colName: string, thEl: HTMLTableCellElement) => {
     e.preventDefault();
@@ -73,6 +92,7 @@ const DataTable: React.FC<DataTableProps> = ({
     : columns.map((c) => ({ type: 'column' as const, name: c }));
 
   return (
+    <>
     <div className={wrapperClass}>
     <div className="data-view" ref={scrollRef}>
       <table className="data-table" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
@@ -92,16 +112,22 @@ const DataTable: React.FC<DataTableProps> = ({
               }
               const colName = item.name!;
               const width = colWidths[colName];
+              const meta = columnMeta?.find((c) => c.COLUMN_NAME === colName);
               return (
                 <th
                   key={colName}
                   onClick={() => { if (!justResizedRef.current) onSortClick(colName); }}
-                  style={{ cursor: 'pointer', position: 'relative', width: width ? `${width}px` : undefined }}
+                  style={{ cursor: 'pointer', width: width ? `${width}px` : undefined }}
+                  className="col-header-with-tooltip"
+                  onMouseEnter={meta ? (e) => handleThMouseEnter(e, meta, colName) : undefined}
+                  onMouseLeave={meta ? handleThMouseLeave : undefined}
                 >
                   <span className="col-header-text">{colName}</span>
+                  {sortCol === colName && (
+                    <span className="col-sort-indicator">{sortDir === 'desc' ? ' →' : ' ←'}</span>
+                  )}
                   <span
                     className="col-info-icon"
-                    title="Column info"
                     onClick={(e) => { e.stopPropagation(); onColumnClick(colName); }}
                   >
                     ℹ
@@ -141,12 +167,13 @@ const DataTable: React.FC<DataTableProps> = ({
                   >
                     ⋯
                   </button>
-                  {openMenuIdx === i && (
+                  {openMenuIdx === i && ReactDOM.createPortal(
                     <div className="row-menu-dropdown" ref={menuRef} style={{ top: menuPos.top, left: menuPos.left }}>
                       <div className="row-menu-item" onClick={() => { setOpenMenuIdx(null); onRowClick(row); }}>View Row Data</div>
                       <div className="row-menu-item" onClick={() => { setOpenMenuIdx(null); onCloneRow(row); }}>Clone Row</div>
                       <div className="row-menu-item row-menu-item-danger" onClick={() => { setOpenMenuIdx(null); onDeleteRow(row); }}>Delete Row</div>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </td>
                 {displayItems.map((item, j) => {
@@ -181,6 +208,30 @@ const DataTable: React.FC<DataTableProps> = ({
       </table>
     </div>
     </div>
+    {tooltip && ReactDOM.createPortal(
+      <div
+        className="col-header-tooltip"
+        style={{ display: 'block', position: 'fixed', left: tooltip.x, top: tooltip.y, zIndex: 9999 }}
+      >
+        <div className="col-tooltip-name">{tooltip.colName}</div>
+        <div className="col-tooltip-row">
+          <span className="col-tooltip-label">Type</span>
+          <span className="col-tooltip-value">
+            {tooltip.meta.DATA_LENGTH != null
+              ? `${tooltip.meta.DATA_TYPE}(${tooltip.meta.DATA_LENGTH})`
+              : tooltip.meta.DATA_TYPE}
+          </span>
+        </div>
+        <div className="col-tooltip-row">
+          <span className="col-tooltip-label">Mandatory</span>
+          <span className={`col-tooltip-value ${tooltip.meta.NULLABLE === 'N' ? 'col-tooltip-yes' : ''}`}>
+            {tooltip.meta.NULLABLE === 'N' ? 'Yes' : 'No'}
+          </span>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

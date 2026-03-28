@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ViewMode } from '../../types';
 
 interface ToolbarProps {
   columns: string[];
-  selectCols: string;
+  where: string;
   sortCol: string;
   sortDir: string;
   limit: number;
   viewMode: ViewMode;
-  onSelectColsChange: (v: string) => void;
+  onWhereChange: (v: string) => void;
   onSortColChange: (v: string) => void;
   onSortDirChange: (v: string) => void;
   onLimitChange: (v: number) => void;
@@ -18,19 +18,40 @@ interface ToolbarProps {
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
-  columns, selectCols, sortCol, sortDir, limit, viewMode,
-  onSelectColsChange, onSortColChange, onSortDirChange,
+  columns, where, sortCol, sortDir, limit, viewMode,
+  onWhereChange, onSortColChange, onSortDirChange,
   onLimitChange, onViewModeChange, onRefresh, onShowTableInfo,
 }) => {
+  const [localWhere, setLocalWhere] = useState(where);
+  const [localLimit, setLocalLimit] = useState(String(limit));
+
+  const handleWhereKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onWhereChange(localWhere);
+    }
+  };
+
+  const handleLimitKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const v = Number(localLimit);
+      onLimitChange(v > 0 ? v : 100);
+    }
+  };
+
+  // Sync local state when parent resets values (e.g. table change)
+  React.useEffect(() => { setLocalWhere(where); }, [where]);
+  React.useEffect(() => { setLocalLimit(String(limit)); }, [limit]);
+
   return (
     <div className="toolbar">
       <div className="toolbar-group">
-        <label>Select</label>
+        <label>Where</label>
         <input
-          value={selectCols}
-          onChange={(e) => onSelectColsChange(e.target.value)}
-          placeholder="* or COL1, COL2"
-          style={{ width: 160 }}
+          value={localWhere}
+          onChange={(e) => setLocalWhere(e.target.value)}
+          onKeyDown={handleWhereKey}
+          placeholder="e.g. NAME = 'aaa' AND AGE > 30"
+          style={{ width: 260 }}
         />
       </div>
 
@@ -52,8 +73,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <label>Limit</label>
         <input
           type="number"
-          value={limit}
-          onChange={(e) => onLimitChange(Number(e.target.value))}
+          value={localLimit}
+          onChange={(e) => setLocalLimit(e.target.value)}
+          onKeyDown={handleLimitKey}
           style={{ width: 70 }}
           min={1}
         />

@@ -13,6 +13,7 @@ import InsertForm from './components/floating/InsertForm';
 import FilterDropdown from './components/filter/FilterDropdown';
 import PresetQueryPanel from './components/query/PresetQueryPanel';
 import ExportButton from './components/export/ExportButton';
+import Toast, { ToastMessage } from './components/ui/Toast';
 
 // Per-table state that should be remembered when switching tables
 interface TableState {
@@ -21,7 +22,7 @@ interface TableState {
   activePresetArgs: Record<string, string>;
   sortCol: string;
   sortDir: string;
-  selectCols: string;
+  where: string;
   viewMode: ViewMode;
 }
 
@@ -48,10 +49,11 @@ const App: React.FC = () => {
   const [indexes, setIndexes] = useState<Record<string, any>[]>([]);
   const [tableSize, setTableSize] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
+  const [slowQuery, setSlowQuery] = useState(false);
   const [error, setError] = useState('');
 
   // Query params
-  const [selectCols, setSelectCols] = useState('');
+  const [where, setWhere] = useState('');
   const [sortCol, setSortCol] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [limit, setLimit] = useState(100);
@@ -68,6 +70,17 @@ const App: React.FC = () => {
   const [activePresetQuery, setActivePresetQuery] = useState<PresetQuery | null>(null);
   const [activePresetArgs, setActivePresetArgs] = useState<Record<string, string>>({});
 
+  // Toast notifications
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  let toastCounter = 0;
+  const addToast = useCallback((type: 'success' | 'error', text: string, duration?: string) => {
+    const id = Date.now() + (toastCounter++);
+    setToasts((prev) => [...prev, { id, type, text, duration }]);
+  }, []);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+  const formatDuration = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
   // Floating windows
   const [floatingWindows, setFloatingWindows] = useState<FloatingWindowType[]>([]);
   let floatingCounter = 0;
@@ -108,6 +121,7 @@ const App: React.FC = () => {
     if (!selectedClient || !selectedTable) return;
     setLoading(true);
     setError('');
+    const t0 = Date.now();
     try {
       const [colData, filterData, presetData] = await Promise.all([
         api.getColumns(selectedClient, selectedTable),
@@ -135,7 +149,7 @@ const App: React.FC = () => {
         });
       } else {
         const params: Record<string, string> = { limit: String(limit), offset: String(offset) };
-        if (selectCols) params.select = selectCols;
+        if (where) params.where = where;
         if (sortCol) { params.sort = sortCol; params.sort_dir = sortDir; }
         rowData = await api.getRows(selectedClient, selectedTable, params);
       }
@@ -146,16 +160,24 @@ const App: React.FC = () => {
           ? Object.keys(rowData[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns')
           : (colData || []).map((c: any) => c.COLUMN_NAME)
       );
+      addToast('success', `Loaded ${selectedTable}`, formatDuration(Date.now() - t0));
     } catch (e: any) {
       setError(e.message);
+      addToast('error', e.message || 'Query failed', formatDuration(Date.now() - t0));
     } finally {
       setLoading(false);
     }
-  }, [selectedClient, selectedTable, selectCols, sortCol, sortDir, limit, currentPage, activePresetQuery, activePresetArgs]);
+  }, [selectedClient, selectedTable, where, sortCol, sortDir, limit, currentPage, activePresetQuery, activePresetArgs, addToast]);
 
   useEffect(() => {
     loadTableData();
   }, [loadTableData]);
+
+  useEffect(() => {
+    if (!loading) { setSlowQuery(false); return; }
+    const t = setTimeout(() => setSlowQuery(true), 3000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   // Floating window helpers
   const addFloating = (title: string, type: FloatingWindowType['type'], content: any) => {
@@ -240,6 +262,7 @@ const App: React.FC = () => {
     setActivePresetArgs(args);
     setLoading(true);
     setError('');
+    const t0 = Date.now();
     try {
       setCurrentPage(1);
       const result = await api.executeQuery(selectedClient, selectedTable, { query, args, limit, offset: 0 });
@@ -248,8 +271,10 @@ const App: React.FC = () => {
         setAllColumns(Object.keys(result[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns'));
       }
       api.touchRecentQuery(`${selectedClient}:${selectedTable}:preset`).catch(() => {});
+      addToast('success', 'Query executed', formatDuration(Date.now() - t0));
     } catch (e: any) {
       setError(e.message);
+      addToast('error', e.message || 'Query failed', formatDuration(Date.now() - t0));
     } finally {
       setLoading(false);
     }
@@ -269,7 +294,7 @@ const App: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
   const queryParams: Record<string, string> = { limit: String(limit) };
-  if (selectCols) queryParams.select = selectCols;
+  if (where) queryParams.where = where;
   if (sortCol) { queryParams.sort = sortCol; queryParams.sort_dir = sortDir; }
 
   return (
@@ -291,7 +316,7 @@ const App: React.FC = () => {
                 activePresetArgs,
                 sortCol,
                 sortDir,
-                selectCols,
+                where,
                 viewMode,
               },
             }));
@@ -301,7 +326,7 @@ const App: React.FC = () => {
           if (cached) {
             setSortCol(cached.sortCol);
             setSortDir(cached.sortDir);
-            setSelectCols(cached.selectCols);
+            setWhere(cached.where);
             setActiveFilter(cached.activeFilter);
             setActivePresetQuery(cached.activePresetQuery);
             setActivePresetArgs(cached.activePresetArgs);
@@ -309,7 +334,7 @@ const App: React.FC = () => {
           } else {
             setSortCol('');
             setSortDir('asc');
-            setSelectCols('');
+            setWhere('');
             setActiveFilter(null);
             setActivePresetQuery(null);
             setActivePresetArgs({});
@@ -327,12 +352,12 @@ const App: React.FC = () => {
           <>
             <Toolbar
               columns={allColumns}
-              selectCols={selectCols}
+              where={where}
               sortCol={sortCol}
               sortDir={sortDir}
               limit={limit}
               viewMode={viewMode}
-              onSelectColsChange={setSelectCols}
+              onWhereChange={setWhere}
               onSortColChange={setSortCol}
               onSortDirChange={setSortDir}
               onLimitChange={(v: number) => { setLimit(v > 0 ? v : 100); setCurrentPage(1); }}
@@ -341,7 +366,7 @@ const App: React.FC = () => {
               onShowTableInfo={handleShowTableInfo}
             />
 
-            <div className="toolbar" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <div className="toolbar toolbar-secondary" style={{ borderTop: 'none', paddingTop: 0 }}>
               <FilterDropdown
                 filters={filters}
                 activeFilter={activeFilter}
@@ -372,6 +397,7 @@ const App: React.FC = () => {
                 </div>
               )}
               {loading && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</span>}
+              {slowQuery && <span style={{ fontSize: 12, color: '#d97706', fontWeight: 600 }}>⏳ Query is taking longer than usual…</span>}
               {error && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{error}</span>}
             </div>
 
@@ -396,6 +422,9 @@ const App: React.FC = () => {
                 columns={visibleColumns}
                 filterItems={filterItems}
                 pageOffset={(currentPage - 1) * limit}
+                columnMeta={columnMeta as any}
+                sortCol={sortCol}
+                sortDir={sortDir}
                 onRowClick={handleRowClick}
                 onColumnClick={handleColumnClick}
                 onSortClick={handleSortClick}
@@ -408,7 +437,11 @@ const App: React.FC = () => {
                 rows={rows}
                 allColumns={allColumns}
                 filterColumns={activeFilter?.columns || null}
+                columnMeta={columnMeta as any}
+                sortCol={sortCol}
+                sortDir={sortDir}
                 onColumnClick={handleColumnClick}
+                onSortClick={handleSortClick}
                 onFieldClick={handleFieldClick}
                 onRowClick={handleRowClick}
               />
@@ -418,7 +451,8 @@ const App: React.FC = () => {
       </div>
 
       {floatingWindows.map((win) => (
-        <FloatingWindow key={win.id} window={win} onClose={closeFloating} onPopOut={popOutFloating}>
+        <FloatingWindow key={win.id} window={win} onClose={closeFloating} onPopOut={popOutFloating}
+          disablePopOut={win.type === 'insert-form' || win.type === 'delete-confirm' || win.type === 'field-edit'}>
           {win.type === 'row-json' && <RowJsonContent row={win.content} />}
           {win.type === 'column-info' && (
             <ColumnInfoContent
@@ -480,6 +514,7 @@ const App: React.FC = () => {
           )}
         </FloatingWindow>
       ))}
+      <Toast messages={toasts} onDismiss={dismissToast} />
     </div>
   );
 };

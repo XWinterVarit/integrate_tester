@@ -284,6 +284,41 @@ clients:
                 type: "string"
                 description: "Username who made the change (e.g. admin, SYSTEM)"
 
+      - name: "<SPACE>"
+      - name: "<COMMENTARY> Documents"
+      # ── DOCUMENTS: 5 rows, BLOB/CLOB columns for binary data testing ──
+      - name: "DOCUMENTS"
+        preset_filters:
+          - name: "File Overview"
+            details: "Document name, type, size and uploader"
+            columns:
+              - "DOCUMENT_ID"
+              - "DOC_NAME"
+              - "DOC_TYPE"
+              - "FILE_SIZE"
+              - "UPLOADED_BY"
+              - "UPLOADED_AT"
+              - "DESCRIPTION"
+        preset_queries:
+          - name: "By Type"
+            query: "SELECT * FROM {THIS_TABLE} WHERE DOC_TYPE = :DOC_TYPE ORDER BY UPLOADED_AT DESC"
+            arguments:
+              - name: "DOC_TYPE"
+                type: "string"
+                description: "MIME type (e.g. text/csv, image/png)"
+          - name: "By Uploader"
+            query: "SELECT * FROM {THIS_TABLE} WHERE UPLOADED_BY = :UPLOADER ORDER BY UPLOADED_AT DESC"
+            arguments:
+              - name: "UPLOADER"
+                type: "string"
+                description: "Username who uploaded the file"
+          - name: "Large Files"
+            query: "SELECT * FROM {THIS_TABLE} WHERE FILE_SIZE >= :MIN_SIZE ORDER BY FILE_SIZE DESC"
+            arguments:
+              - name: "MIN_SIZE"
+                type: "number"
+                description: "Minimum file size in bytes"
+
   # ── Second client: Sales team view (subset of tables) ──
   - name: "sales_team"
     user: "LEARN1"

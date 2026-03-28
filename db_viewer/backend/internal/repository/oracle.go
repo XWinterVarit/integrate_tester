@@ -34,6 +34,10 @@ func (r *OracleRepository) QueryRows(ctx context.Context, params model.RowQueryP
 		query = fmt.Sprintf("SELECT ROWID, %s FROM %s.%s", cols, r.schema, table)
 	}
 
+	if params.Where != "" {
+		query += fmt.Sprintf(" WHERE %s", params.Where)
+	}
+
 	if params.Sort != "" {
 		dir := "ASC"
 		if params.SortDir == "desc" {

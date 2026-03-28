@@ -189,8 +189,8 @@ export const TableInfoContent: React.FC<TableInfoContentProps> = ({ size, constr
           <div className="value">{sizeInfo.ROW_COUNT ?? '—'}</div>
         </div>
         <div className="info-card">
-          <div className="label">Size (bytes)</div>
-          <div className="value">{sizeInfo.BYTES ?? '—'}</div>
+          <div className="label">Size (MB)</div>
+          <div className="value">{sizeInfo.BYTES != null ? (sizeInfo.BYTES / 1048576).toFixed(2) + ' MB' : '—'}</div>
         </div>
         <div className="info-card">
           <div className="label">Blocks</div>

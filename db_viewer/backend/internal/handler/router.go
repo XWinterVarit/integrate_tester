@@ -1,12 +1,24 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/XWinterVarit/integrate_tester/db_viewer/backend/internal/service"
 )
 
-func NewRouter(svc *service.TableService) *http.ServeMux {
+const defaultQueryTimeout = 10 * time.Second
+
+func timeoutMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), defaultQueryTimeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func NewRouter(svc *service.TableService) http.Handler {
 	mux := http.NewServeMux()
 
 	clientH := NewClientHandler(svc)
@@ -46,5 +58,5 @@ func NewRouter(svc *service.TableService) *http.ServeMux {
 	mux.HandleFunc("POST /api/recent/filter", recentH.TouchFilter)
 	mux.HandleFunc("POST /api/recent/query", recentH.TouchQuery)
 
-	return mux
+	return timeoutMiddleware(mux)
 }

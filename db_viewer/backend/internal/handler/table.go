@@ -24,6 +24,7 @@ func (h *TableHandler) GetRows(w http.ResponseWriter, r *http.Request) {
 
 	params := model.RowQueryParams{
 		Select:  r.URL.Query().Get("select"),
+		Where:   r.URL.Query().Get("where"),
 		Sort:    r.URL.Query().Get("sort"),
 		SortDir: r.URL.Query().Get("sort_dir"),
 		Limit:   parseLimit(r.URL.Query().Get("limit"), 100),

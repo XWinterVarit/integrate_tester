@@ -153,6 +153,32 @@ input:focus, select:focus {
   font-weight: 500;
 }
 
+.toolbar-secondary {
+  padding: 4px 10px;
+  gap: 6px;
+  font-size: 11px;
+}
+.toolbar-secondary label {
+  font-size: 11px;
+}
+.toolbar-secondary button,
+.toolbar-secondary select,
+.toolbar-secondary input {
+  font-size: 11px;
+  padding: 2px 7px;
+  height: 24px;
+}
+.toolbar-secondary .pagination-bar {
+  gap: 3px;
+}
+.toolbar-secondary .pagination-bar button {
+  font-size: 11px;
+  padding: 1px 6px;
+  height: 22px;
+}
+.toolbar-secondary .pagination-info {
+  font-size: 11px;
+}
 .toolbar-group {
   display: flex;
   align-items: center;
@@ -162,7 +188,6 @@ input:focus, select:focus {
 .data-view-wrapper {
   flex: 1;
   position: relative;
-  overflow: hidden;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -225,8 +250,10 @@ table.data-table th {
   font-size: 12px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
   position: sticky;
   top: 0;
+  z-index: 3;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
@@ -255,10 +282,41 @@ table.data-table tr {
 
 .transpose-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
 }
 
+.transpose-table thead th {
+  background: var(--bg-primary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  overflow: visible;
+}
+.transpose-table thead th:hover {
+  z-index: 200;
+}
+
+.transpose-table tbody td.field-label {
+  overflow: visible;
+}
+
+.transpose-table tbody td.col-header-with-tooltip {
+  overflow: visible;
+  position: relative;
+}
+
+.transpose-table tbody td.col-header-with-tooltip:hover {
+  z-index: 200;
+  overflow: visible;
+}
 .transpose-table .field-label {
   background: var(--bg-primary);
   padding: 8px 12px;
@@ -266,10 +324,20 @@ table.data-table tr {
   font-size: 12px;
   color: var(--text-secondary);
   width: 200px;
-  border-bottom: 1px solid var(--border);
   cursor: pointer;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
 }
 
+.transpose-table thead th.field-label {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.06);
+}
 .transpose-table .field-label:hover {
   color: var(--accent);
 }
@@ -285,14 +353,19 @@ table.data-table tr {
 }
 
 .transpose-table .commentary-row td {
-  padding: 10px 12px;
+  padding: 6px 12px;
   border: none;
-  font-size: 11px;
-  font-weight: 600;
+  border-top: 2px solid #bbb;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-  background: var(--bg-primary);
+  letter-spacing: 1px;
+  color: #888;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.transpose-table .commentary-row td.field-label {
+  border-right: 1px solid var(--border);
 }
 
 .floating-window {
@@ -531,7 +604,71 @@ table.data-table tr {
   border-color: var(--accent);
 }
 
+/* Column header tooltip */
+.col-header-tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  transform: none;
+  z-index: 9000;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  padding: 10px 14px;
+  min-width: 180px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.col-header-with-tooltip:hover .col-header-tooltip {
+  display: block;
+}
+
+.col-tooltip-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+}
+
+.col-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.col-tooltip-label {
+  color: var(--text-secondary);
+}
+
+.col-tooltip-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.col-tooltip-yes {
+  color: #16a34a;
+}
+
+.col-tooltip-no {
+  color: #dc2626;
+}
+
 /* Column header info icon */
+.col-sort-indicator {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: bold;
+  margin-left: 2px;
+}
+
 .col-info-icon {
   display: inline-block;
   margin-left: 4px;
@@ -704,6 +841,11 @@ table.data-table tr {
   font-size: 11px;
   color: var(--text-secondary);
   padding: 4px 2px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--bg-secondary);
+  box-shadow: 2px 0 4px rgba(0,0,0,0.06);
 }
 
 .row-action-cell {
@@ -712,9 +854,17 @@ table.data-table tr {
   max-width: 48px;
   text-align: center;
   padding: 2px 2px;
-  position: relative;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-primary);
   user-select: none;
   white-space: nowrap;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.06);
+}
+
+table.data-table tr:hover .row-action-cell {
+  background: var(--bg-secondary);
 }
 
 .row-action-num {
@@ -996,4 +1146,56 @@ tr:hover .row-menu-btn {
 .delete-btn-confirm:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+  pointer-events: all;
+  cursor: pointer;
+  animation: toast-in 0.2s ease;
+  min-width: 200px;
+  max-width: 360px;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.toast-success {
+  background: #e6f9ee;
+  border: 1px solid #52c97a;
+  color: #1a6b3a;
+}
+.toast-error {
+  background: #fdecea;
+  border: 1px solid #e05c5c;
+  color: #7a1a1a;
+}
+.toast-icon {
+  font-weight: bold;
+  font-size: 14px;
+}
+.toast-text {
+  flex: 1;
+}
+.toast-duration {
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: nowrap;
 }

@@ -32,6 +32,7 @@ type RecentTouchRequest struct {
 
 type RowQueryParams struct {
 	Select  string
+	Where   string
 	Sort    string
 	SortDir string
 	Limit   int

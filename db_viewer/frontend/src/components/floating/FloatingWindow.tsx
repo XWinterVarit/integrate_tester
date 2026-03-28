@@ -6,9 +6,10 @@ interface FloatingWindowProps {
   onClose: (id: string) => void;
   onPopOut: (win: FloatingWindowType) => void;
   children: React.ReactNode;
+  disablePopOut?: boolean;
 }
 
-const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, onPopOut, children }) => {
+const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, onPopOut, children, disablePopOut }) => {
   const [pos, setPos] = useState({ x: win.x, y: win.y });
   const [size, setSize] = useState({ w: win.width, h: win.height });
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
@@ -77,7 +78,7 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
       <div className="floating-header" onMouseDown={onDragStart}>
         <span className="title">{win.title}</span>
         <div className="actions">
-          <button onClick={handlePopOut}>↗ Pop Out</button>
+          {!disablePopOut && <button onClick={handlePopOut}>↗ Pop Out</button>}
           <button onClick={() => onClose(win.id)}>✕</button>
         </div>
       </div>

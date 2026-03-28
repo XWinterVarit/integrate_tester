@@ -25,7 +25,9 @@ BEGIN EXECUTE IMMEDIATE 'DROP TABLE EMPLOYEES CASCADE CONSTRAINTS'; EXCEPTION WH
 -- 6) AUDIT_LOG (standalone)
 BEGIN EXECUTE IMMEDIATE 'DROP TABLE AUDIT_LOG CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
 /
-
+-- 7) DOCUMENTS (standalone)
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE DOCUMENTS CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
 -- Drop sequences
 BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE SEQ_CUSTOMERS'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -2289 THEN RAISE; END IF; END;
 /
@@ -307,8 +309,124 @@ VALUES ('CUSTOMERS', 'UPDATE', 3, '{"MEMBERSHIP":"GOLD"}', '{"MEMBERSHIP":"PLATI
 INSERT INTO AUDIT_LOG (TABLE_NAME, OPERATION, RECORD_ID, OLD_VALUE, NEW_VALUE, CHANGED_BY)
 VALUES ('ORDERS',    'INSERT', 20, NULL, '{"CUSTOMER_ID":11,"PRODUCT_ID":4,"STATUS":"CONFIRMED"}', 'web_app');
 
-COMMIT;
+-- -------------------- DOCUMENTS ------------------------------------------
+CREATE TABLE DOCUMENTS (
+    DOCUMENT_ID   NUMBER         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    DOC_NAME      VARCHAR2(200)  NOT NULL,
+    DOC_TYPE      VARCHAR2(50)   NOT NULL,
+    FILE_SIZE     NUMBER(12)     DEFAULT 0,
+    UPLOADED_BY   VARCHAR2(100),
+    UPLOADED_AT   TIMESTAMP      DEFAULT SYSTIMESTAMP,
+    DESCRIPTION   VARCHAR2(500),
+    FILE_CONTENT  BLOB,
+    THUMBNAIL     BLOB,
+    METADATA      CLOB
+);
 
+-- -------------------- DOCUMENTS data (5 rows) --------------------------------
+-- Row 1: small CSV file in BLOB
+INSERT INTO DOCUMENTS (DOC_NAME, DOC_TYPE, FILE_SIZE, UPLOADED_BY, DESCRIPTION, FILE_CONTENT, THUMBNAIL, METADATA)
+VALUES (
+    'customers_export.csv',
+    'text/csv',
+    512,
+    'admin',
+    'Monthly customer export',
+    UTL_RAW.CAST_TO_RAW('id,first_name,last_name,email,country' || CHR(10) ||
+        '1,Alice,Johnson,alice@example.com,USA' || CHR(10) ||
+        '2,Bob,Smith,bob@example.com,UK' || CHR(10) ||
+        '3,Charlie,Brown,charlie@example.com,Canada' || CHR(10) ||
+        '4,Diana,Prince,diana@example.com,Australia' || CHR(10) ||
+        '5,Eve,Adams,eve@example.com,Germany' || CHR(10) ||
+        '6,Frank,Castle,frank@example.com,France' || CHR(10) ||
+        '7,Grace,Hopper,grace@example.com,USA' || CHR(10) ||
+        '8,Hank,Pym,hank@example.com,UK' || CHR(10) ||
+        '9,Iris,West,iris@example.com,Canada' || CHR(10) ||
+        '10,Jack,Sparrow,jack@example.com,Australia'),
+    NULL,
+    '{"source":"crm","version":"1.0","columns":["id","first_name","last_name","email","country"]}'
+);
+
+-- Row 2: product price list CSV
+INSERT INTO DOCUMENTS (DOC_NAME, DOC_TYPE, FILE_SIZE, UPLOADED_BY, DESCRIPTION, FILE_CONTENT, THUMBNAIL, METADATA)
+VALUES (
+    'product_prices.csv',
+    'text/csv',
+    384,
+    'inventory_mgr',
+    'Current product price list',
+    UTL_RAW.CAST_TO_RAW('sku,product_name,price,category,in_stock' || CHR(10) ||
+        'ELEC-LP-001,Laptop Pro 15,999.99,Electronics,Y' || CHR(10) ||
+        'ELEC-SP-002,Smartphone X,599.00,Electronics,Y' || CHR(10) ||
+        'ELEC-TW-003,True Wireless Earbuds,149.50,Electronics,Y' || CHR(10) ||
+        'BOOK-PY-004,Python Programming,49.99,Books,Y' || CHR(10) ||
+        'BOOK-DG-005,Data Science Guide,44.99,Books,N' || CHR(10) ||
+        'HOME-CF-006,Coffee Maker Deluxe,129.99,Home,Y' || CHR(10) ||
+        'SPRT-YM-007,Yoga Mat Premium,29.99,Sports,Y' || CHR(10) ||
+        'ELEC-SC-008,Smart Watch Series 5,449.00,Electronics,Y'),
+    NULL,
+    '{"source":"inventory","version":"2.1","generated_at":"2025-03-01"}'
+);
+
+-- Row 3: binary-like data (simulated image thumbnail)
+INSERT INTO DOCUMENTS (DOC_NAME, DOC_TYPE, FILE_SIZE, UPLOADED_BY, DESCRIPTION, FILE_CONTENT, THUMBNAIL, METADATA)
+VALUES (
+    'company_logo.png',
+    'image/png',
+    2048,
+    'marketing',
+    'Official company logo PNG',
+    HEXTORAW('89504E470D0A1A0A0000000D49484452000000100000001008020000009001' ||
+             '2E00000030494441547801016F00900000FF000000FF000000FF000000FF00' ||
+             '0000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF' ||
+             '000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000'),
+    HEXTORAW('89504E470D0A1A0A0000000D494844520000000800000008080200000004' ||
+             '6BE96500000018494441540801016F00900000FF000000FF000000FF0000'),
+    '{"width":256,"height":256,"color_depth":24,"format":"PNG","dpi":72}'
+);
+
+-- Row 4: large CSV report (order history)
+INSERT INTO DOCUMENTS (DOC_NAME, DOC_TYPE, FILE_SIZE, UPLOADED_BY, DESCRIPTION, FILE_CONTENT, THUMBNAIL, METADATA)
+VALUES (
+    'order_history_q1_2025.csv',
+    'text/csv',
+    1024,
+    'reports_svc',
+    'Q1 2025 order history report',
+    UTL_RAW.CAST_TO_RAW('order_id,customer_id,product_id,quantity,unit_price,status,order_date' || CHR(10) ||
+        '1,1,2,1,599.00,DELIVERED,2025-01-10' || CHR(10) ||
+        '2,2,5,2,44.99,DELIVERED,2025-01-12' || CHR(10) ||
+        '3,3,8,1,129.99,DELIVERED,2025-01-15' || CHR(10) ||
+        '4,4,1,1,999.99,DELIVERED,2025-01-20' || CHR(10) ||
+        '5,5,12,3,59.99,DELIVERED,2025-01-25' || CHR(10) ||
+        '6,6,3,2,149.50,SHIPPED,2025-02-20' || CHR(10) ||
+        '7,7,14,1,44.99,DELIVERED,2025-01-30' || CHR(10) ||
+        '8,8,4,1,599.00,DELIVERED,2025-02-14' || CHR(10) ||
+        '9,9,10,1,449.00,CONFIRMED,2025-03-10' || CHR(10) ||
+        '10,10,7,2,49.99,SHIPPED,2025-03-05' || CHR(10) ||
+        '11,11,1,1,999.99,PENDING,2025-03-20' || CHR(10) ||
+        '12,12,11,3,59.99,CONFIRMED,2025-03-18' || CHR(10) ||
+        '13,1,13,1,79.99,SHIPPED,2025-03-12' || CHR(10) ||
+        '14,3,3,1,149.50,CANCELLED,2025-02-28' || CHR(10) ||
+        '15,5,15,1,29.99,DELIVERED,2025-01-15'),
+    NULL,
+    '{"report_type":"order_history","quarter":"Q1","year":2025,"row_count":15}'
+);
+
+-- Row 5: document with NULL blob (no file uploaded yet)
+INSERT INTO DOCUMENTS (DOC_NAME, DOC_TYPE, FILE_SIZE, UPLOADED_BY, DESCRIPTION, FILE_CONTENT, THUMBNAIL, METADATA)
+VALUES (
+    'pending_upload.pdf',
+    'application/pdf',
+    0,
+    'user_42',
+    'Placeholder - file not yet uploaded',
+    NULL,
+    NULL,
+    '{"status":"pending","expected_size_kb":250}'
+);
+
+COMMIT;
 PROMPT === Mock data setup complete ===
-PROMPT Tables created: CATEGORIES, CUSTOMERS, PRODUCTS, ORDERS, EMPLOYEES, AUDIT_LOG
-PROMPT Row counts: CATEGORIES=6, CUSTOMERS=12, PRODUCTS=15, ORDERS=20, EMPLOYEES=10, AUDIT_LOG=8
+PROMPT Tables created: CATEGORIES, CUSTOMERS, PRODUCTS, ORDERS, EMPLOYEES, AUDIT_LOG, DOCUMENTS
+PROMPT Row counts: CATEGORIES=6, CUSTOMERS=12, PRODUCTS=15, ORDERS=20, EMPLOYEES=10, AUDIT_LOG=8, DOCUMENTS=5
