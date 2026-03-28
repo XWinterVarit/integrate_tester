@@ -4,10 +4,12 @@ import { PresetQuery } from '../../types';
 interface PresetQueryPanelProps {
   presets: PresetQuery[];
   table: string;
-  onExecute: (query: string, args: Record<string, string>) => void;
+  activePreset: PresetQuery | null;
+  onExecute: (query: string, args: Record<string, string>, preset: PresetQuery | null) => void;
+  onClear: () => void;
 }
 
-const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, onExecute }) => {
+const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, activePreset, onExecute, onClear }) => {
   const defaultQuery: PresetQuery = {
     index: -1,
     name: 'Select All',
@@ -43,8 +45,15 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, onE
 
   const handleExecute = () => {
     if (!selected) return;
-    onExecute(selected.query, argValues);
+    const isDefault = selected.index === -1;
+    onExecute(selected.query, argValues, isDefault ? null : selected);
     setSelected(null);
+  };
+
+  const handleClearPreset = () => {
+    onClear();
+    // Re-execute default select all
+    onExecute(defaultQuery.query, {}, null);
   };
 
   return (
@@ -53,6 +62,16 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, onE
         <button className="secondary" onClick={() => setOpen(!open)}>
           Preset Queries
         </button>
+        {activePreset && (
+          <button
+            className="secondary"
+            onClick={handleClearPreset}
+            style={{ marginLeft: 4, fontSize: 11 }}
+            title="Clear active preset query"
+          >
+            ✕ Clear
+          </button>
+        )}
         {open && (
           <div className="preset-dropdown-menu">
             <input
@@ -65,7 +84,7 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, onE
             {filtered.map((p) => (
               <div
                 key={p.index}
-                className="preset-dropdown-item"
+                className={`preset-dropdown-item${activePreset && activePreset.index === p.index ? ' active' : ''}`}
                 onClick={() => handleSelect(p)}
               >
                 {p.name}

@@ -76,8 +76,18 @@ func (s *TableService) ExecuteQuery(ctx context.Context, client string, req mode
 	}
 
 	query := req.Query
+
+	// Inject ROWID so results are editable — wrap as subquery
+	upper := strings.TrimSpace(strings.ToUpper(query))
+	if strings.HasPrefix(upper, "SELECT") && !strings.Contains(upper, "ROWID") {
+		query = "SELECT q.ROWID, q.* FROM (" + query + ") q"
+	}
+
 	if !strings.Contains(strings.ToUpper(query), "FETCH") {
-		query += fmt.Sprintf(" FETCH FIRST %d ROWS ONLY", limit)
+		if req.Offset > 0 {
+			query += fmt.Sprintf(" OFFSET %d ROWS", req.Offset)
+		}
+		query += fmt.Sprintf(" FETCH NEXT %d ROWS ONLY", limit)
 	}
 
 	var args []any
@@ -112,6 +122,14 @@ func (s *TableService) GetIndexes(ctx context.Context, client, table string) ([]
 	return repo.GetIndexes(ctx, table)
 }
 
+func (s *TableService) GetRowCount(ctx context.Context, client, table string) (int, error) {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return 0, err
+	}
+	return repo.GetRowCount(ctx, table)
+}
+
 func (s *TableService) GetTableSize(ctx context.Context, client, table string) ([]map[string]any, error) {
 	repo, err := s.getRepo(client)
 	if err != nil {
@@ -126,6 +144,38 @@ func (s *TableService) UpdateCell(ctx context.Context, client, table string, req
 		return err
 	}
 	return repo.UpdateCell(ctx, table, req.Column, req.Value, req.Rowid)
+}
+
+func (s *TableService) DeleteRow(ctx context.Context, client, table string, req model.DeleteRowRequest) error {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return err
+	}
+	return repo.DeleteRow(ctx, table, req.Rowid)
+}
+
+func (s *TableService) InsertRow(ctx context.Context, client, table string, req model.InsertRowRequest) error {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return err
+	}
+	return repo.InsertRow(ctx, table, req.Columns, req.Values)
+}
+
+func (s *TableService) BuildDeleteQuery(client, table, rowid string) (string, error) {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return "", err
+	}
+	return repo.BuildDeleteQuery(table, rowid), nil
+}
+
+func (s *TableService) BuildInsertQuery(client, table string, columns, values []string) (string, error) {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return "", err
+	}
+	return repo.BuildInsertQuery(table, columns, values), nil
 }
 
 func (s *TableService) GetBlobData(ctx context.Context, client, table, column, rowid string) ([]byte, error) {

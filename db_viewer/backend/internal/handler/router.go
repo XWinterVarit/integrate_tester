@@ -25,7 +25,12 @@ func NewRouter(svc *service.TableService) *http.ServeMux {
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/constraints", tableH.GetConstraints)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/indexes", tableH.GetIndexes)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/size", tableH.GetSize)
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/count", tableH.GetRowCount)
 	mux.HandleFunc("PUT /api/clients/{client}/tables/{table}/rows/update", tableH.UpdateCell)
+	mux.HandleFunc("DELETE /api/clients/{client}/tables/{table}/rows/delete", tableH.DeleteRow)
+	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/rows/insert", tableH.InsertRow)
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/rows/delete-query", tableH.BuildDeleteQuery)
+	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/rows/insert-query", tableH.BuildInsertQuery)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/blob", tableH.DownloadBlob)
 
 	// Query routes

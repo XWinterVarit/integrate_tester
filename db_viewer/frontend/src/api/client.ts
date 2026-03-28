@@ -24,7 +24,7 @@ export const api = {
     return request<Record<string, any>[]>(`/api/clients/${client}/tables/${table}/rows?${qs}`);
   },
 
-  executeQuery: (client: string, table: string, body: { query: string; args: Record<string, string>; limit: number }) =>
+  executeQuery: (client: string, table: string, body: { query: string; args: Record<string, string>; limit: number; offset?: number }) =>
     request<Record<string, any>[]>(`/api/clients/${client}/tables/${table}/query`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -41,6 +41,9 @@ export const api = {
 
   getTableSize: (client: string, table: string) =>
     request<Record<string, any>[]>(`/api/clients/${client}/tables/${table}/size`),
+
+  getRowCount: (client: string, table: string) =>
+    request<{ count: number }>(`/api/clients/${client}/tables/${table}/count`),
 
   getFilters: (client: string, table: string) =>
     request<{ name: string; details: string; columns: string[] }[]>(`/api/clients/${client}/tables/${table}/filters`),
@@ -71,6 +74,27 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return `${BASE_URL}/api/clients/${client}/tables/${table}/blob?${qs}`;
   },
+
+  deleteRow: (client: string, table: string, body: { rowid: string }) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/rows/delete`, {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    }),
+
+  insertRow: (client: string, table: string, body: { columns: string[]; values: string[] }) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/rows/insert`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  buildDeleteQuery: (client: string, table: string, rowid: string) =>
+    request<{ query: string }>(`/api/clients/${client}/tables/${table}/rows/delete-query?rowid=${encodeURIComponent(rowid)}`),
+
+  buildInsertQuery: (client: string, table: string, body: { columns: string[]; values: string[] }) =>
+    request<{ query: string }>(`/api/clients/${client}/tables/${table}/rows/insert-query`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   touchRecentFilter: (key: string) =>
     request<{ status: string }>('/api/recent/filter', {

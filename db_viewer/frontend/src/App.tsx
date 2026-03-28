@@ -8,6 +8,8 @@ import DataTable from './components/table/DataTable';
 import TransposeView from './components/table/TransposeView';
 import FloatingWindow from './components/floating/FloatingWindow';
 import { RowJsonContent, ColumnInfoContent, FieldEditContent, TableInfoContent } from './components/floating/FloatingContent';
+import DeleteConfirm from './components/floating/DeleteConfirm';
+import InsertForm from './components/floating/InsertForm';
 import FilterDropdown from './components/filter/FilterDropdown';
 import PresetQueryPanel from './components/query/PresetQueryPanel';
 import ExportButton from './components/export/ExportButton';
@@ -15,6 +17,8 @@ import ExportButton from './components/export/ExportButton';
 // Per-table state that should be remembered when switching tables
 interface TableState {
   activeFilter: PresetFilter | null;
+  activePresetQuery: PresetQuery | null;
+  activePresetArgs: Record<string, string>;
   sortCol: string;
   sortDir: string;
   selectCols: string;
@@ -51,6 +55,8 @@ const App: React.FC = () => {
   const [sortCol, setSortCol] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [limit, setLimit] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // View
   const [viewMode, setViewMode] = useState<ViewMode>('row');
@@ -59,6 +65,8 @@ const App: React.FC = () => {
   const [filters, setFilters] = useState<PresetFilter[]>([]);
   const [activeFilter, setActiveFilter] = useState<PresetFilter | null>(null);
   const [presetQueries, setPresetQueries] = useState<PresetQuery[]>([]);
+  const [activePresetQuery, setActivePresetQuery] = useState<PresetQuery | null>(null);
+  const [activePresetArgs, setActivePresetArgs] = useState<Record<string, string>>({});
 
   // Floating windows
   const [floatingWindows, setFloatingWindows] = useState<FloatingWindowType[]>([]);
@@ -101,32 +109,49 @@ const App: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const params: Record<string, string> = { limit: String(limit) };
-      if (selectCols) params.select = selectCols;
-      if (sortCol) { params.sort = sortCol; params.sort_dir = sortDir; }
-
-      const [rowData, colData, filterData, presetData] = await Promise.all([
-        api.getRows(selectedClient, selectedTable, params),
+      const [colData, filterData, presetData] = await Promise.all([
         api.getColumns(selectedClient, selectedTable),
         api.getFilters(selectedClient, selectedTable),
         api.getPresetQueries(selectedClient, selectedTable),
       ]);
+      setColumnMeta(colData || []);
+      setFilters(filterData || []);
+      setPresetQueries(presetData || []);
+
+      // Fetch total row count
+      const countData = await api.getRowCount(selectedClient, selectedTable);
+      setTotalCount(countData.count);
+
+      const offset = (currentPage - 1) * limit;
+
+      // If a preset query is active, re-execute it; otherwise do default fetch
+      let rowData: Row[];
+      if (activePresetQuery) {
+        rowData = await api.executeQuery(selectedClient, selectedTable, {
+          query: activePresetQuery.query,
+          args: activePresetArgs,
+          limit,
+          offset,
+        });
+      } else {
+        const params: Record<string, string> = { limit: String(limit), offset: String(offset) };
+        if (selectCols) params.select = selectCols;
+        if (sortCol) { params.sort = sortCol; params.sort_dir = sortDir; }
+        rowData = await api.getRows(selectedClient, selectedTable, params);
+      }
 
       setRows(rowData || []);
-      setColumnMeta(colData || []);
       setAllColumns(
         rowData && rowData.length > 0
           ? Object.keys(rowData[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns')
           : (colData || []).map((c: any) => c.COLUMN_NAME)
       );
-      setFilters(filterData || []);
-      setPresetQueries(presetData || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedClient, selectedTable, selectCols, sortCol, sortDir, limit]);
+  }, [selectedClient, selectedTable, selectCols, sortCol, sortDir, limit, currentPage, activePresetQuery, activePresetArgs]);
 
   useEffect(() => {
     loadTableData();
@@ -173,6 +198,18 @@ const App: React.FC = () => {
     addFloating(`${colName}`, 'field-edit', { colName, value: row[colName], row });
   };
 
+  const handleDeleteRow = (row: Row) => {
+    addFloating('Delete Row', 'delete-confirm', { row });
+  };
+
+  const handleCloneRow = (row: Row) => {
+    addFloating('Clone Row (Insert)', 'insert-form', { prefillRow: row });
+  };
+
+  const handleInsertNew = () => {
+    addFloating('Insert New Row', 'insert-form', { prefillRow: null });
+  };
+
   const handleShowTableInfo = async () => {
     if (!selectedClient || !selectedTable) return;
     try {
@@ -197,12 +234,15 @@ const App: React.FC = () => {
     }
   };
 
-  const handlePresetExecute = async (query: string, args: Record<string, string>) => {
+  const handlePresetExecute = async (query: string, args: Record<string, string>, preset: PresetQuery | null) => {
     if (!selectedClient || !selectedTable) return;
+    setActivePresetQuery(preset);
+    setActivePresetArgs(args);
     setLoading(true);
     setError('');
     try {
-      const result = await api.executeQuery(selectedClient, selectedTable, { query, args, limit });
+      setCurrentPage(1);
+      const result = await api.executeQuery(selectedClient, selectedTable, { query, args, limit, offset: 0 });
       setRows(result || []);
       if (result && result.length > 0) {
         setAllColumns(Object.keys(result[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns'));
@@ -226,6 +266,8 @@ const App: React.FC = () => {
     return parseFilterColumns(activeFilter.columns, allColumns);
   }, [activeFilter, allColumns]);
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+
   const queryParams: Record<string, string> = { limit: String(limit) };
   if (selectCols) queryParams.select = selectCols;
   if (sortCol) { queryParams.sort = sortCol; queryParams.sort_dir = sortDir; }
@@ -245,6 +287,8 @@ const App: React.FC = () => {
               ...prev,
               [`${selectedClient}:${selectedTable}`]: {
                 activeFilter,
+                activePresetQuery,
+                activePresetArgs,
                 sortCol,
                 sortDir,
                 selectCols,
@@ -259,14 +303,19 @@ const App: React.FC = () => {
             setSortDir(cached.sortDir);
             setSelectCols(cached.selectCols);
             setActiveFilter(cached.activeFilter);
+            setActivePresetQuery(cached.activePresetQuery);
+            setActivePresetArgs(cached.activePresetArgs);
             setViewMode(cached.viewMode);
           } else {
             setSortCol('');
             setSortDir('asc');
             setSelectCols('');
             setActiveFilter(null);
+            setActivePresetQuery(null);
+            setActivePresetArgs({});
             setViewMode('row');
           }
+          setCurrentPage(1);
           setSelectedTable(t);
         }}
       />
@@ -286,7 +335,7 @@ const App: React.FC = () => {
               onSelectColsChange={setSelectCols}
               onSortColChange={setSortCol}
               onSortDirChange={setSortDir}
-              onLimitChange={setLimit}
+              onLimitChange={(v: number) => { setLimit(v); setCurrentPage(1); }}
               onViewModeChange={setViewMode}
               onRefresh={loadTableData}
               onShowTableInfo={handleShowTableInfo}
@@ -301,26 +350,58 @@ const App: React.FC = () => {
               <PresetQueryPanel
                 presets={presetQueries}
                 table={selectedTable}
+                activePreset={activePresetQuery}
                 onExecute={handlePresetExecute}
+                onClear={() => { setActivePresetQuery(null); setActivePresetArgs({}); }}
               />
+              <button onClick={handleInsertNew}>➕ Insert</button>
               <ExportButton
                 client={selectedClient}
                 table={selectedTable}
                 queryParams={queryParams}
               />
+              {totalPages > 1 && (
+                <div className="pagination-bar">
+                  <button disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>«</button>
+                  <button disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => p - 1)}>‹</button>
+                  <span className="pagination-info">
+                    Page {currentPage} of {totalPages} ({totalCount} rows)
+                  </span>
+                  <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => p + 1)}>›</button>
+                  <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(totalPages)}>»</button>
+                </div>
+              )}
               {loading && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Loading...</span>}
               {error && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{error}</span>}
             </div>
+
+            {(activeFilter || activePresetQuery) && (
+              <div className="active-indicators">
+                {activeFilter && (
+                  <span className="active-indicator filter-indicator">
+                    🔍 Filter: <strong>{activeFilter.name}</strong>
+                  </span>
+                )}
+                {activePresetQuery && (
+                  <span className="active-indicator query-indicator">
+                    📋 Query: <strong>{activePresetQuery.name}</strong>
+                  </span>
+                )}
+              </div>
+            )}
 
             {viewMode === 'row' ? (
               <DataTable
                 rows={rows}
                 columns={visibleColumns}
                 filterItems={filterItems}
+                pageOffset={(currentPage - 1) * limit}
                 onRowClick={handleRowClick}
                 onColumnClick={handleColumnClick}
                 onSortClick={handleSortClick}
                 onFieldClick={handleFieldClick}
+                onDeleteRow={handleDeleteRow}
+                onCloneRow={handleCloneRow}
               />
             ) : (
               <TransposeView
@@ -371,6 +452,30 @@ const App: React.FC = () => {
               size={win.content.size || []}
               constraints={win.content.constraints || []}
               indexes={win.content.indexes || []}
+            />
+          )}
+          {win.type === 'delete-confirm' && (
+            <DeleteConfirm
+              client={selectedClient}
+              table={selectedTable}
+              row={win.content.row}
+              onDeleted={() => {
+                closeFloating(win.id);
+                loadTableData();
+              }}
+            />
+          )}
+          {win.type === 'insert-form' && (
+            <InsertForm
+              client={selectedClient}
+              table={selectedTable}
+              columnMeta={columnMeta as any}
+              columns={visibleColumns}
+              prefillRow={win.content.prefillRow}
+              onInserted={() => {
+                closeFloating(win.id);
+                loadTableData();
+              }}
             />
           )}
         </FloatingWindow>

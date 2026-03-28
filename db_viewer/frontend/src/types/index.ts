@@ -58,7 +58,7 @@ export interface FloatingWindow {
   id: string;
   title: string;
   content: any;
-  type: 'row-json' | 'column-info' | 'table-info' | 'field-edit';
+  type: 'row-json' | 'column-info' | 'table-info' | 'field-edit' | 'delete-confirm' | 'insert-form';
   x: number;
   y: number;
   width: number;

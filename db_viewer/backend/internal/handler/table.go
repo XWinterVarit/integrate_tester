@@ -27,6 +27,7 @@ func (h *TableHandler) GetRows(w http.ResponseWriter, r *http.Request) {
 		Sort:    r.URL.Query().Get("sort"),
 		SortDir: r.URL.Query().Get("sort_dir"),
 		Limit:   parseLimit(r.URL.Query().Get("limit"), 100),
+		Offset:  parseOffset(r.URL.Query().Get("offset")),
 	}
 
 	rows, err := h.svc.GetRows(r.Context(), client, table, params)
@@ -85,6 +86,18 @@ func (h *TableHandler) GetSize(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, data)
 }
 
+func (h *TableHandler) GetRowCount(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+
+	count, err := h.svc.GetRowCount(r.Context(), client, table)
+	if err != nil {
+		writeError(w, fmt.Sprintf("query error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]int{"count": count})
+}
+
 func (h *TableHandler) UpdateCell(w http.ResponseWriter, r *http.Request) {
 	client := r.PathValue("client")
 	table := r.PathValue("table")
@@ -100,6 +113,76 @@ func (h *TableHandler) UpdateCell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, model.StatusResponse{Status: "ok"})
+}
+
+func (h *TableHandler) DeleteRow(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+
+	var req model.DeleteRowRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.DeleteRow(r.Context(), client, table, req); err != nil {
+		writeError(w, fmt.Sprintf("delete error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, model.StatusResponse{Status: "ok"})
+}
+
+func (h *TableHandler) InsertRow(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+
+	var req model.InsertRowRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.InsertRow(r.Context(), client, table, req); err != nil {
+		writeError(w, fmt.Sprintf("insert error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, model.StatusResponse{Status: "ok"})
+}
+
+func (h *TableHandler) BuildDeleteQuery(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+	rowid := r.URL.Query().Get("rowid")
+
+	if rowid == "" {
+		writeError(w, "missing rowid", http.StatusBadRequest)
+		return
+	}
+
+	query, err := h.svc.BuildDeleteQuery(client, table, rowid)
+	if err != nil {
+		writeError(w, fmt.Sprintf("error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"query": query})
+}
+
+func (h *TableHandler) BuildInsertQuery(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+
+	var req model.InsertRowRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	query, err := h.svc.BuildInsertQuery(client, table, req.Columns, req.Values)
+	if err != nil {
+		writeError(w, fmt.Sprintf("error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"query": query})
 }
 
 func (h *TableHandler) DownloadBlob(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +215,17 @@ func parseLimit(s string, defaultVal int) int {
 	v, err := strconv.Atoi(s)
 	if err != nil || v <= 0 {
 		return defaultVal
+	}
+	return v
+}
+
+func parseOffset(s string) int {
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return 0
 	}
 	return v
 }

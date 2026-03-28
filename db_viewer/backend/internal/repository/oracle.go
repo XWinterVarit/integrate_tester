@@ -26,7 +26,12 @@ func (r *OracleRepository) QueryRows(ctx context.Context, params model.RowQueryP
 		cols = params.Select
 	}
 
-	query := fmt.Sprintf("SELECT ROWID, %s FROM %s.%s", cols, r.schema, table)
+	var query string
+	if cols == "*" {
+		query = fmt.Sprintf("SELECT t.ROWID, t.* FROM %s.%s t", r.schema, table)
+	} else {
+		query = fmt.Sprintf("SELECT ROWID, %s FROM %s.%s", cols, r.schema, table)
+	}
 
 	if params.Sort != "" {
 		dir := "ASC"
@@ -40,7 +45,10 @@ func (r *OracleRepository) QueryRows(ctx context.Context, params model.RowQueryP
 	if limit <= 0 {
 		limit = 100
 	}
-	query += fmt.Sprintf(" FETCH FIRST %d ROWS ONLY", limit)
+	if params.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d ROWS", params.Offset)
+	}
+	query += fmt.Sprintf(" FETCH NEXT %d ROWS ONLY", limit)
 
 	return r.executeQuery(ctx, query)
 }
@@ -91,6 +99,42 @@ func (r *OracleRepository) UpdateCell(ctx context.Context, table, column, value,
 	return err
 }
 
+func (r *OracleRepository) DeleteRow(ctx context.Context, table, rowid string) error {
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE ROWID = :1", r.schema, table)
+	_, err := r.db.ExecContext(ctx, query, rowid)
+	return err
+}
+
+func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns, values []string) error {
+	placeholders := make([]string, len(columns))
+	args := make([]any, len(values))
+	for i := range columns {
+		placeholders[i] = fmt.Sprintf(":%d", i+1)
+		args[i] = values[i]
+	}
+	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)",
+		r.schema, table, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
+}
+
+func (r *OracleRepository) BuildDeleteQuery(table, rowid string) string {
+	return fmt.Sprintf("DELETE FROM %s.%s WHERE ROWID = '%s'", r.schema, table, rowid)
+}
+
+func (r *OracleRepository) BuildInsertQuery(table string, columns, values []string) string {
+	quotedVals := make([]string, len(values))
+	for i, v := range values {
+		if v == "" {
+			quotedVals[i] = "NULL"
+		} else {
+			quotedVals[i] = "'" + strings.ReplaceAll(v, "'", "''") + "'"
+		}
+	}
+	return fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)",
+		r.schema, table, strings.Join(columns, ", "), strings.Join(quotedVals, ", "))
+}
+
 func (r *OracleRepository) ExportRows(ctx context.Context, query string) ([]map[string]any, error) {
 	return r.executeQuery(ctx, query)
 }
@@ -103,6 +147,29 @@ func (r *OracleRepository) GetBlobData(ctx context.Context, table, column, rowid
 		return nil, err
 	}
 	return data, nil
+}
+
+func (r *OracleRepository) GetRowCount(ctx context.Context, table string) (int, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) AS CNT FROM %s.%s", r.schema, table)
+	rows, err := r.executeQuery(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) > 0 {
+		if v, ok := rows[0]["CNT"]; ok {
+			switch n := v.(type) {
+			case float64:
+				return int(n), nil
+			case int64:
+				return int(n), nil
+			case string:
+				var c int
+				fmt.Sscanf(n, "%d", &c)
+				return c, nil
+			}
+		}
+	}
+	return 0, nil
 }
 
 func (r *OracleRepository) Schema() string {
