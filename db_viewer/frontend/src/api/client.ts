@@ -74,6 +74,14 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return `${BASE_URL}/api/clients/${client}/tables/${table}/blob?${qs}`;
   },
+  uploadBlob: (client: string, table: string, params: { column: string; rowid: string }, data: ArrayBuffer) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<{ ok: boolean }>(`/api/clients/${client}/tables/${table}/blob?${qs}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: data,
+    });
+  },
 
   deleteRow: (client: string, table: string, body: { rowid: string }) =>
     request<{ status: string }>(`/api/clients/${client}/tables/${table}/rows/delete`, {

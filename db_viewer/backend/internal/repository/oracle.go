@@ -130,7 +130,7 @@ func parseISODate(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns, values []string) error {
+func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns, values []string) (string, error) {
 	// Fetch virtual columns for this table so we can skip them in the INSERT.
 	virtualCols := map[string]bool{}
 	rows, err := r.db.QueryContext(ctx,
@@ -165,10 +165,16 @@ func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns,
 	for i := range filteredCols {
 		placeholders[i] = fmt.Sprintf(":%d", i+1)
 	}
-	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)",
-		r.schema, table, strings.Join(filteredCols, ", "), strings.Join(placeholders, ", "))
+	var rowid string
+	rowidPlaceholder := fmt.Sprintf(":%d", len(filteredCols)+1)
+	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s) RETURNING ROWID INTO %s",
+		r.schema, table, strings.Join(filteredCols, ", "), strings.Join(placeholders, ", "), rowidPlaceholder)
+	filteredVals = append(filteredVals, sql.Out{Dest: &rowid})
 	_, err = r.db.ExecContext(ctx, query, filteredVals...)
-	return err
+	if err != nil {
+		return "", err
+	}
+	return rowid, nil
 }
 
 func (r *OracleRepository) BuildDeleteQuery(table, rowid string) string {
@@ -200,6 +206,12 @@ func (r *OracleRepository) GetBlobData(ctx context.Context, table, column, rowid
 		return nil, err
 	}
 	return data, nil
+}
+
+func (r *OracleRepository) UploadBlobData(ctx context.Context, table, column, rowid string, data []byte) error {
+	query := fmt.Sprintf("UPDATE %s.%s SET %s = :1 WHERE ROWID = :2", r.schema, table, column)
+	_, err := r.db.ExecContext(ctx, query, data, rowid)
+	return err
 }
 
 func (r *OracleRepository) GetRowCount(ctx context.Context, table string) (int, error) {
@@ -256,7 +268,8 @@ func scanRows(rows *sql.Rows) ([]map[string]any, error) {
 	if err == nil {
 		for i, ct := range colTypes {
 			dbType := strings.ToUpper(ct.DatabaseTypeName())
-			if dbType == "BLOB" || dbType == "RAW" || dbType == "LONG RAW" {
+			if dbType == "BLOB" || dbType == "RAW" || dbType == "LONG RAW" || dbType == "LONGRAW" ||
+				strings.Contains(dbType, "BLOB") || strings.Contains(dbType, "LOB") {
 				blobCols[i] = true
 			}
 		}

@@ -154,10 +154,10 @@ func (s *TableService) DeleteRow(ctx context.Context, client, table string, req 
 	return repo.DeleteRow(ctx, table, req.Rowid)
 }
 
-func (s *TableService) InsertRow(ctx context.Context, client, table string, req model.InsertRowRequest) error {
+func (s *TableService) InsertRow(ctx context.Context, client, table string, req model.InsertRowRequest) (string, error) {
 	repo, err := s.getRepo(client)
 	if err != nil {
-		return err
+		return "", err
 	}
 	return repo.InsertRow(ctx, table, req.Columns, req.Values)
 }
@@ -184,6 +184,14 @@ func (s *TableService) GetBlobData(ctx context.Context, client, table, column, r
 		return nil, err
 	}
 	return repo.GetBlobData(ctx, table, column, rowid)
+}
+
+func (s *TableService) UploadBlobData(ctx context.Context, client, table, column, rowid string, data []byte) error {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return err
+	}
+	return repo.UploadBlobData(ctx, table, column, rowid, data)
 }
 
 func (s *TableService) GetFilters(client, table string) []model.PresetFilterResponse {

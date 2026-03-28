@@ -124,7 +124,7 @@ const DataTable: React.FC<DataTableProps> = ({
                 >
                   <span className="col-header-text">{colName}</span>
                   {sortCol === colName && (
-                    <span className="col-sort-indicator">{sortDir === 'desc' ? ' →' : ' ←'}</span>
+                    <span className="col-sort-indicator">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span>
                   )}
                   <span
                     className="col-info-icon"
@@ -196,7 +196,10 @@ const DataTable: React.FC<DataTableProps> = ({
                       onClick={() => onFieldClick(row, colName)}
                     >
                       {isNull ? 'null' : isBlob ? (
-                        <span className="blob-truncated">{String(val).substring(0, 40)}{String(val).length > 40 ? '…' : ''}</span>
+                        <span className="blob-truncated">
+                          {String(val) === '' ? '(empty)' : '[BLOB]'}
+                          {String(val).endsWith('...') ? <span className="blob-truncate-indicator"> ***truncate***</span> : ''}
+                        </span>
                       ) : String(val)}
                     </td>
                   );

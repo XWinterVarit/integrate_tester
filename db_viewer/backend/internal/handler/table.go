@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -143,11 +144,12 @@ func (h *TableHandler) InsertRow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.InsertRow(r.Context(), client, table, req); err != nil {
+	rowid, err := h.svc.InsertRow(r.Context(), client, table, req)
+	if err != nil {
 		writeError(w, fmt.Sprintf("insert error: %v", err), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, model.StatusResponse{Status: "ok"})
+	writeJSON(w, map[string]string{"status": "ok", "rowid": rowid})
 }
 
 func (h *TableHandler) BuildDeleteQuery(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +186,29 @@ func (h *TableHandler) BuildInsertQuery(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, map[string]string{"query": query})
+}
+
+func (h *TableHandler) UploadBlob(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+	column := r.URL.Query().Get("column")
+	rowid := r.URL.Query().Get("rowid")
+	if column == "" || rowid == "" {
+		writeError(w, "missing column or rowid", http.StatusBadRequest)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20) // 50 MB limit
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, fmt.Sprintf("read error: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := h.svc.UploadBlobData(r.Context(), client, table, column, rowid, data); err != nil {
+		writeError(w, fmt.Sprintf("upload error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"ok":true}`))
 }
 
 func (h *TableHandler) DownloadBlob(w http.ResponseWriter, r *http.Request) {

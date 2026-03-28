@@ -77,15 +77,33 @@ interface FieldEditContentProps {
   onSaved?: (columnName: string, newValue: string, row: Record<string, any>) => void;
 }
 
+const BLOB_DISPLAY_LIMIT = 500 * 1024; // 500 KB — show full content below this
+const BLOB_SAVE_LIMIT = 10 * 1024 * 1024; // 10 MB — disable save above this
+
+function base64ByteLength(b64: string): number {
+  const s = b64.endsWith('...') ? b64.slice(0, -3) : b64;
+  const padding = (s.match(/=+$/) || [''])[0].length;
+  return Math.floor(s.length * 3 / 4) - padding;
+}
+
+function formatMB(bytes: number): string {
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
+
 export const FieldEditContent: React.FC<FieldEditContentProps> = ({
   columnName, value, client, table, row, onSaved,
 }) => {
   const [editValue, setEditValue] = useState(String(value ?? ''));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   const blobCols: string[] = row['__blob_columns'] || [];
   const isBlob = blobCols.includes(columnName);
+
+  const blobStr = String(value ?? '');
+  const isTruncated = blobStr.endsWith('...');
+  const approxBytes = blobStr ? base64ByteLength(blobStr) : 0;
 
   const handleSave = async () => {
     setSaving(true);
@@ -114,6 +132,24 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
     window.open(url, '_blank');
   };
 
+  const handleBlobUpload = async () => {
+    if (!uploadFile) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      const buf = await uploadFile.arrayBuffer();
+      await api.uploadBlob(client, table, { column: columnName, rowid: String(row['ROWID'] || '') }, buf);
+      setMessage('✓ Uploaded successfully');
+      setTimeout(() => { if (onSaved) onSaved(columnName, '', row); }, 800);
+    } catch (e: any) {
+      setMessage(`Error: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadFileTooLarge = uploadFile ? uploadFile.size > BLOB_SAVE_LIMIT : false;
+
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
@@ -127,21 +163,50 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
       </div>
       {isBlob ? (
         <div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
-              Preview (truncated)
-            </div>
-            <div style={{
-              fontFamily: 'monospace', fontSize: 12, padding: 8,
-              background: 'var(--bg-secondary, #f5f5f5)', borderRadius: 4,
-              wordBreak: 'break-all', maxHeight: 120, overflow: 'auto',
-            }}>
-              {String(value ?? '')}
-            </div>
+          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+            Size: <strong>{approxBytes > 0 ? formatMB(approxBytes) + (isTruncated ? ' (truncated preview)' : '') : '(empty)'}</strong>
           </div>
-          <button onClick={handleBlobDownload} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            ⬇ Download BLOB
-          </button>
+          {blobStr && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                {isTruncated ? 'Preview (truncated)' : 'Content (base64)'}
+              </div>
+              <div style={{
+                fontFamily: 'monospace', fontSize: 12, padding: 8,
+                background: 'var(--bg-secondary, #f5f5f5)', borderRadius: 4,
+                wordBreak: 'break-all', maxHeight: 120, overflow: 'auto',
+              }}>
+                {isTruncated ? blobStr.slice(0, -3) + ' ***truncate***' : blobStr}
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="secondary" onClick={handleBlobDownload}>⬇ Download</button>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 6 }}>
+              Upload new file
+            </div>
+            <input
+              type="file"
+              style={{ marginBottom: 8, fontSize: 12 }}
+              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+            />
+            {uploadFile && (
+              <div style={{ fontSize: 12, marginBottom: 8, color: uploadFileTooLarge ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                {uploadFile.name} — {formatMB(uploadFile.size)}
+                {uploadFileTooLarge && ' (exceeds 10 MB limit)'}
+              </div>
+            )}
+            <button onClick={handleBlobUpload} disabled={saving || !uploadFile || uploadFileTooLarge}>
+              {saving ? 'Uploading...' : '⬆ Upload & Save'}
+            </button>
+            {message && (
+              <span style={{ fontSize: 12, marginLeft: 8, color: message.startsWith('✓') ? 'var(--success, green)' : 'var(--danger)' }}>
+                {message}
+              </span>
+            )}
+          </div>
         </div>
       ) : (
         <>

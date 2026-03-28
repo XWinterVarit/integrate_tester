@@ -798,6 +798,12 @@ table.data-table tr {
   color: var(--text-secondary);
   font-style: italic;
 }
+.blob-truncate-indicator {
+  color: #e07b00;
+  font-style: italic;
+  font-size: 10px;
+  font-weight: 600;
+}
 
 /* Filter space/commentary columns in row view */
 .filter-space-col {
