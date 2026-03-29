@@ -12,6 +12,7 @@ import DeleteConfirm from './components/floating/DeleteConfirm';
 import InsertForm from './components/floating/InsertForm';
 import FilterDropdown from './components/filter/FilterDropdown';
 import PresetQueryPanel from './components/query/PresetQueryPanel';
+import PresetQueryContent from './components/query/PresetQueryContent';
 import ExportButton from './components/export/ExportButton';
 import Toast, { ToastMessage } from './components/ui/Toast';
 
@@ -378,6 +379,7 @@ const App: React.FC = () => {
                 activePreset={activePresetQuery}
                 onExecute={handlePresetExecute}
                 onClear={() => { setActivePresetQuery(null); setActivePresetArgs({}); }}
+                onOpenPopup={(preset) => addFloating(`Preset: ${preset.name}`, 'preset-query', { preset })}
               />
               <ExportButton
                 client={selectedClient}
@@ -452,7 +454,7 @@ const App: React.FC = () => {
 
       {floatingWindows.map((win) => (
         <FloatingWindow key={win.id} window={win} onClose={closeFloating} onPopOut={popOutFloating}
-          disablePopOut={win.type === 'insert-form' || win.type === 'delete-confirm' || win.type === 'field-edit'}>
+          disablePopOut={win.type === 'insert-form' || win.type === 'delete-confirm' || win.type === 'field-edit' || win.type === 'preset-query'}>
           {win.type === 'row-json' && <RowJsonContent row={win.content} />}
           {win.type === 'column-info' && (
             <ColumnInfoContent
@@ -497,6 +499,13 @@ const App: React.FC = () => {
                 closeFloating(win.id);
                 loadTableData();
               }}
+            />
+          )}
+          {win.type === 'preset-query' && (
+            <PresetQueryContent
+              preset={win.content.preset}
+              onExecute={handlePresetExecute}
+              onClose={() => closeFloating(win.id)}
             />
           )}
           {win.type === 'insert-form' && (
