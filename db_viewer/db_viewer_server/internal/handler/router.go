@@ -38,7 +38,7 @@ func timeoutMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func NewRouter(svc *service.TableService, presetSvc *service.PresetService) http.Handler {
+func NewRouter(svc *service.TableService, presetSvc *service.PresetService, clientMgmtSvc *service.ClientService, lockSvc *service.LockService) http.Handler {
 	mux := http.NewServeMux()
 
 	clientH := NewClientHandler(svc)
@@ -47,10 +47,27 @@ func NewRouter(svc *service.TableService, presetSvc *service.PresetService) http
 	exportH := NewExportHandler(svc)
 	recentH := NewRecentHandler(svc)
 	presetH := NewPresetHandler(presetSvc)
+	clientMgmtH := NewClientMgmtHandler(clientMgmtSvc)
+	lockH := NewLockHandler(lockSvc)
 
-	// Client routes
+	// Client routes (existing — used by frontend for sidebar)
 	mux.HandleFunc("GET /api/clients", clientH.List)
 	mux.HandleFunc("GET /api/clients/{client}/tables", clientH.ListTables)
+
+	// Client management routes
+	mux.HandleFunc("GET /api/manage/clients", clientMgmtH.ListClients)
+	mux.HandleFunc("POST /api/manage/clients", clientMgmtH.CreateClient)
+	mux.HandleFunc("PUT /api/manage/clients/{name}", clientMgmtH.UpdateClient)
+	mux.HandleFunc("DELETE /api/manage/clients/{name}", clientMgmtH.DeleteClient)
+	mux.HandleFunc("POST /api/manage/clients/test-connection", clientMgmtH.TestConnection)
+	mux.HandleFunc("GET /api/manage/clients/{name}/all-tables", clientMgmtH.ListAllTables)
+	mux.HandleFunc("POST /api/manage/clients/list-tables", clientMgmtH.ListTablesFromConnection)
+
+	// Lock routes
+	mux.HandleFunc("POST /api/locks", lockH.Acquire)
+	mux.HandleFunc("PUT /api/locks/{key}", lockH.Renew)
+	mux.HandleFunc("DELETE /api/locks/{key}", lockH.Release)
+	mux.HandleFunc("GET /api/locks/{key}", lockH.GetLock)
 
 	// Table data routes
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/rows", tableH.GetRows)

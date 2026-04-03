@@ -9,6 +9,8 @@ interface SidebarProps {
   onSelectTable: (name: string) => void;
   onShowTableInfo?: (table: string) => void;
   onShowFieldDesc?: (table: string) => void;
+  onManageClients?: () => void;
+  onShowAbout?: () => void;
 }
 
 const MIN_WIDTH = 160;
@@ -18,6 +20,7 @@ const DEFAULT_WIDTH = 240;
 const Sidebar: React.FC<SidebarProps> = ({
   clients, tables, selectedClient, selectedTable,
   onSelectClient, onSelectTable, onShowTableInfo, onShowFieldDesc,
+  onManageClients, onShowAbout,
 }) => {
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('sidebar-width');
@@ -25,7 +28,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   });
   const [menuTable, setMenuTable] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [headerMenu, setHeaderMenu] = useState(false);
+  const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
 
   // Resize logic
@@ -52,17 +58,20 @@ const Sidebar: React.FC<SidebarProps> = ({
     document.addEventListener('mouseup', onMouseUp);
   }, [width]);
 
-  // Close context menu on outside click
+  // Close context menus on outside click
   useEffect(() => {
-    if (!menuTable) return;
+    if (!menuTable && !headerMenu) return;
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (menuTable && menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuTable(null);
+      }
+      if (headerMenu && headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [menuTable]);
+  }, [menuTable, headerMenu]);
 
   const handleMoreClick = (e: React.MouseEvent, table: string) => {
     e.preventDefault();
@@ -72,10 +81,21 @@ const Sidebar: React.FC<SidebarProps> = ({
     setMenuTable((prev) => (prev === table ? null : table));
   };
 
+  const handleHeaderMoreClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHeaderMenuPos({ top: rect.bottom + 2, left: rect.left });
+    setHeaderMenu((prev) => !prev);
+  };
+
   return (
     <>
       <div className="sidebar" style={{ width, minWidth: width }}>
-        <div className="sidebar-header">Connections</div>
+        <div className="sidebar-header sidebar-header-hoverable">
+          Connections
+          <span className="sidebar-header-more" onClick={handleHeaderMoreClick}>···</span>
+        </div>
         {clients.map((c) => (
           <div
             key={c.name}
@@ -88,6 +108,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
         ))}
+        {clients.length === 0 && (
+          <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>
+            No clients configured
+          </div>
+        )}
         {selectedClient && (
           <>
             <div className="sidebar-header">Tables</div>
@@ -157,6 +182,34 @@ const Sidebar: React.FC<SidebarProps> = ({
             }}
           >
             Field Desc
+          </div>
+        </div>
+      )}
+
+      {headerMenu && (
+        <div
+          ref={headerMenuRef}
+          className="sidebar-context-menu"
+          style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
+        >
+          <div
+            className="sidebar-context-item"
+            onClick={() => {
+              onManageClients?.();
+              setHeaderMenu(false);
+            }}
+          >
+            Manage Clients
+          </div>
+          <div className="sidebar-context-divider" />
+          <div
+            className="sidebar-context-item"
+            onClick={() => {
+              onShowAbout?.();
+              setHeaderMenu(false);
+            }}
+          >
+            About
           </div>
         </div>
       )}

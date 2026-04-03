@@ -154,4 +154,100 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(descs),
     }),
+
+  // Client Management
+  listManagedClients: () =>
+    request<ClientConfigResponse[]>('/api/manage/clients'),
+  createClient: (body: SaveClientRequest) =>
+    request<{ status: string }>('/api/manage/clients', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateClient: (name: string, body: SaveClientRequest) =>
+    request<{ status: string }>(`/api/manage/clients/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteClient: (name: string) =>
+    request<{ status: string }>(`/api/manage/clients/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }),
+  testConnection: (body: TestConnectionRequest) =>
+    request<{ success: boolean; error?: string }>('/api/manage/clients/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  listAllTablesForClient: (name: string) =>
+    request<{ tables: string[] }>(`/api/manage/clients/${encodeURIComponent(name)}/all-tables`),
+  listTablesFromConnection: (body: TestConnectionRequest) =>
+    request<{ tables: string[] }>('/api/manage/clients/list-tables', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Locks
+  acquireLock: (body: AcquireLockRequest) =>
+    request<LockResponse>('/api/locks', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  renewLock: (key: string, scopeClient: string, sessionId: string) =>
+    request<LockResponse>(`/api/locks/${encodeURIComponent(key)}?scope_client=${encodeURIComponent(scopeClient)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ session_id: sessionId }),
+    }),
+  releaseLock: (key: string, scopeClient: string, sessionId: string) =>
+    request<{ status: string }>(`/api/locks/${encodeURIComponent(key)}?scope_client=${encodeURIComponent(scopeClient)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ session_id: sessionId }),
+    }),
+  releaseLockBeacon: (key: string, scopeClient: string, sessionId: string) => {
+    const url = `${BASE_URL}/api/locks/${encodeURIComponent(key)}?scope_client=${encodeURIComponent(scopeClient)}`;
+    navigator.sendBeacon(url, JSON.stringify({ session_id: sessionId }));
+  },
 };
+
+export interface ClientConfigResponse {
+  name: string;
+  display_name: string;
+  host: string;
+  port: number;
+  service_name: string;
+  username: string;
+  tables: string[];
+}
+
+export interface SaveClientRequest {
+  name: string;
+  display_name: string;
+  host: string;
+  port: number;
+  service_name: string;
+  username: string;
+  password: string;
+  tables: string[];
+}
+
+export interface TestConnectionRequest {
+  host: string;
+  port: number;
+  service_name: string;
+  username: string;
+  password: string;
+}
+
+export interface AcquireLockRequest {
+  resource_type: string;
+  resource_id: string;
+  scope_client: string;
+  session_id: string;
+}
+
+export interface LockResponse {
+  key: string;
+  locked_by: string;
+  locked_at: string;
+  expires_at: string;
+  resource_type: string;
+  resource_id: string;
+}

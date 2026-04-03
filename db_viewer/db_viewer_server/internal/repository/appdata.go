@@ -109,6 +109,16 @@ func (r *AppDataRepository) Delete(ctx context.Context, feature, client, table, 
 	return nil
 }
 
+// DeleteByScope deletes all rows where SCOPE_CLIENT matches (for cascade delete).
+func (r *AppDataRepository) DeleteByScope(ctx context.Context, client string) error {
+	query := `DELETE FROM DB_VIEWER_APP_DATA WHERE SCOPE_CLIENT = :1`
+	_, err := r.db.ExecContext(ctx, query, client)
+	if err != nil {
+		return fmt.Errorf("appdata delete by scope: %w", err)
+	}
+	return nil
+}
+
 func scanAppDataRows(rows *sql.Rows) ([]AppDataRow, error) {
 	var result []AppDataRow
 	for rows.Next() {

@@ -16,36 +16,39 @@ import (
 )
 
 type TableService struct {
-	repos         map[string]*repository.OracleRepository
-	clientConfigs map[string]model.ClientConfig
+	pool          *ConnectionPool
+	clientSvc     *ClientService
 	recentFilters *tracker.RecentTracker
 	recentQueries *tracker.RecentTracker
 }
 
 func NewTableService(
-	repos map[string]*repository.OracleRepository,
-	clientConfigs map[string]model.ClientConfig,
+	pool *ConnectionPool,
+	clientSvc *ClientService,
 	recentFilters *tracker.RecentTracker,
 	recentQueries *tracker.RecentTracker,
 ) *TableService {
 	return &TableService{
-		repos:         repos,
-		clientConfigs: clientConfigs,
+		pool:          pool,
+		clientSvc:     clientSvc,
 		recentFilters: recentFilters,
 		recentQueries: recentQueries,
 	}
 }
 
 func (s *TableService) ListClients() []model.ClientInfo {
+	configs := s.clientSvc.GetClientConfigs(context.Background())
 	var result []model.ClientInfo
-	for _, c := range s.clientConfigs {
-		result = append(result, model.ClientInfo{Name: c.Name, Schema: c.Schema})
+	for _, c := range configs {
+		result = append(result, model.ClientInfo{Name: c.Name, DisplayName: c.Name, Schema: c.Schema})
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result
 }
 
 func (s *TableService) ListTables(client string) ([]string, error) {
-	cfg, ok := s.clientConfigs[client]
+	configs := s.clientSvc.GetClientConfigs(context.Background())
+	cfg, ok := configs[client]
 	if !ok {
 		return nil, fmt.Errorf("client not found: %s", client)
 	}
@@ -216,7 +219,8 @@ func (s *TableService) ExportTable(ctx context.Context, w io.Writer, client, tab
 		return err
 	}
 
-	cfg := s.clientConfigs[client]
+	configs := s.clientSvc.GetClientConfigs(context.Background())
+	cfg := configs[client]
 	var query string
 	if exportType == "full" {
 		query = fmt.Sprintf("SELECT * FROM %s.%s", cfg.Schema, table)
@@ -276,7 +280,7 @@ func (s *TableService) TouchRecentQuery(key string) {
 }
 
 func (s *TableService) getRepo(client string) (*repository.OracleRepository, error) {
-	repo, ok := s.repos[client]
+	repo, ok := s.pool.GetRepo(client)
 	if !ok {
 		return nil, fmt.Errorf("client not found: %s", client)
 	}
@@ -284,7 +288,8 @@ func (s *TableService) getRepo(client string) (*repository.OracleRepository, err
 }
 
 func (s *TableService) getTableConfig(client, table string) (model.TableConfig, bool) {
-	cfg, ok := s.clientConfigs[client]
+	configs := s.clientSvc.GetClientConfigs(context.Background())
+	cfg, ok := configs[client]
 	if !ok {
 		return model.TableConfig{}, false
 	}

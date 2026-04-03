@@ -1,0 +1,222 @@
+/* Insert form — Apple-style card layout */
+.insert-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px;
+}
+
+.insert-form-fields {
+  max-height: 55vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.insert-field-card {
+  background: var(--bg-secondary, #f9f9fb);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: var(--transition);
+}
+
+.insert-field-card:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+}
+
+.insert-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.insert-field-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.insert-field-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.insert-type-badge {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1a56db;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.insert-size-badge {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.insert-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  transition: var(--transition);
+}
+
+.insert-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.insert-field-default {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.nullable-yes {
+  color: #16a34a;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.nullable-no {
+  color: var(--danger, #dc3545);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.insert-query-preview {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.insert-query-label,
+.delete-query-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.insert-query-sql,
+.delete-query-sql {
+  font-family: monospace;
+  font-size: 12px;
+  padding: 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 100px;
+  overflow: auto;
+  margin: 0;
+}
+
+.insert-actions,
+.delete-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+
+.insert-message,
+.delete-message {
+  font-size: 12px;
+}
+
+.insert-message.success,
+.delete-message.success {
+  color: #16a34a;
+}
+
+.insert-message.error,
+.delete-message.error {
+  color: var(--danger, #dc3545);
+}
+
+/* Delete confirm */
+.delete-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.delete-warning {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--danger, #dc3545);
+  padding: 8px 12px;
+  background: rgba(220, 53, 69, 0.08);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.delete-summary-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.delete-row-data {
+  max-height: 200px;
+  overflow: auto;
+  font-size: 12px;
+  padding: 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+}
+
+.delete-row-field {
+  padding: 2px 0;
+  display: flex;
+  gap: 8px;
+}
+
+.delete-field-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 120px;
+}
+
+.delete-field-value {
+  word-break: break-all;
+}
+
+.delete-query-preview {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.delete-btn-confirm {
+  padding: 6px 16px;
+  background: var(--danger, #dc3545);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.delete-btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+

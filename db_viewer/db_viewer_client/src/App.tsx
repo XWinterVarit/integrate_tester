@@ -16,6 +16,8 @@ import PresetQueryContent from './components/query/PresetQueryContent';
 import ExportButton from './components/export/ExportButton';
 import Toast, { ToastMessage } from './components/ui/Toast';
 import FieldDescEditor from './components/field/FieldDescEditor';
+import ClientManagerModal from './components/client/ClientManagerModal';
+import AboutModal from './components/client/AboutModal';
 
 // Per-table state that should be remembered when switching tables
 interface TableState {
@@ -55,6 +57,8 @@ const App: React.FC = () => {
   const [error, setError] = useState('');
   const [fieldDescriptions, setFieldDescriptions] = useState<Record<string, string>>({});
   const [fieldDescTarget, setFieldDescTarget] = useState<string | null>(null);
+  const [showClientManager, setShowClientManager] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   // Query params
   const [where, setWhere] = useState('');
@@ -99,8 +103,11 @@ const App: React.FC = () => {
   }, [selectedClient, selectedTable]);
 
   // Load clients on mount
-  useEffect(() => {
+  const refreshClients = useCallback(() => {
     api.getClients().then(setClients).catch(() => {});
+  }, []);
+  useEffect(() => {
+    refreshClients();
   }, []); 
 
   // Track the previous client to detect real client changes vs initial mount
@@ -329,6 +336,8 @@ const App: React.FC = () => {
           }
         }}
         onShowFieldDesc={(t: string) => setFieldDescTarget(t)}
+        onManageClients={() => setShowClientManager(true)}
+        onShowAbout={() => setShowAbout(true)}
         onSelectTable={(t: string) => {
           // Save current table's state
           if (selectedTable) {
@@ -558,6 +567,16 @@ const App: React.FC = () => {
         </FloatingWindow>
       ))}
       <Toast messages={toasts} onDismiss={dismissToast} />
+
+      <ClientManagerModal
+        open={showClientManager}
+        onClose={() => setShowClientManager(false)}
+        onSaved={refreshClients}
+      />
+      <AboutModal
+        open={showAbout}
+        onClose={() => setShowAbout(false)}
+      />
 
       {fieldDescTarget && (
         <FieldDescEditor

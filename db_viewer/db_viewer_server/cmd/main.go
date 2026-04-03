@@ -13,7 +13,6 @@ import (
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/config"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/handler"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/middleware"
-	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/model"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/repository"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/service"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/tracker"
@@ -30,38 +29,50 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	repos := make(map[string]*repository.OracleRepository)
-	appDataRepos := make(map[string]*repository.AppDataRepository)
-	clientConfigs := make(map[string]model.ClientConfig)
+	// Use the first client from config.yml as the "admin" connection for reading CLIENT_CONFIG rows.
+	// All client configs are stored in DB_VIEWER_APP_DATA on this admin DB.
+	if len(cfg.Clients) == 0 {
+		log.Fatal("At least one client must be defined in config.yml for the admin connection")
+	}
+	adminClient := cfg.Clients[0]
+	adminConnStr := fmt.Sprintf("oracle://%s:%s@%s:%d/%s",
+		adminClient.User, adminClient.Password, adminClient.Host, adminClient.Port, adminClient.Service)
+	adminDB, err := sql.Open("oracle", adminConnStr)
+	if err != nil {
+		log.Fatalf("Failed to open admin connection: %v", err)
+	}
+	adminDB.SetMaxOpenConns(10)
+	adminDB.SetMaxIdleConns(5)
 
-	for _, c := range cfg.Clients {
-		connStr := fmt.Sprintf("oracle://%s:%s@%s:%d/%s",
-			c.User, c.Password, c.Host, c.Port, c.Service)
+	adminRepo := repository.NewAppDataRepository(adminDB)
 
-		db, err := sql.Open("oracle", connStr)
-		if err != nil {
-			log.Printf("Warning: failed to open connection for client %s: %v", c.Name, err)
-			continue
-		}
-		db.SetMaxOpenConns(10)
-		db.SetMaxIdleConns(5)
+	// Ensure the app data table exists on the admin DB
+	if err := adminRepo.EnsureTable(context.Background()); err != nil {
+		log.Printf("Warning: failed to ensure app data table: %v", err)
+	}
 
-		repos[c.Name] = repository.NewOracle(db, c.Schema)
-		appDataRepos[c.Name] = repository.NewAppDataRepository(db)
-		clientConfigs[c.Name] = c
+	// Create connection pool and services
+	pool := service.NewConnectionPool()
+	clientSvc := service.NewClientService(pool, adminRepo)
+	lockSvc := service.NewLockService(adminRepo)
+
+	// Load all client configs from DB and open connections
+	if err := clientSvc.LoadClientsFromDB(context.Background()); err != nil {
+		log.Printf("Warning: failed to load clients from DB: %v", err)
 	}
 
 	recentFilters := tracker.New()
 	recentQueries := tracker.New()
 
-	svc := service.NewTableService(repos, clientConfigs, recentFilters, recentQueries)
-	presetSvc := service.NewPresetService(appDataRepos, clientConfigs)
+	tableSvc := service.NewTableService(pool, clientSvc, recentFilters, recentQueries)
+	presetSvc := service.NewPresetService(pool, clientSvc)
 
+	// Ensure app data tables on all client connections
 	if err := presetSvc.EnsureTables(context.Background()); err != nil {
 		log.Printf("Warning: failed to ensure app data tables: %v", err)
 	}
 
-	router := handler.NewRouter(svc, presetSvc)
+	router := handler.NewRouter(tableSvc, presetSvc, clientSvc, lockSvc)
 	srv := middleware.CORS(cfg.Server.CORSOrigin, router)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

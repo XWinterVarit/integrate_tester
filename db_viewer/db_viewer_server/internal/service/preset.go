@@ -11,6 +11,22 @@ import (
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/repository"
 )
 
+func (s *PresetService) getAppRepo(client string) (*repository.AppDataRepository, error) {
+	repo, ok := s.pool.GetAppDataRepo(client)
+	if !ok {
+		return nil, fmt.Errorf("client not found: %s", client)
+	}
+	return repo, nil
+}
+
+func (s *PresetService) getSchema(client string) string {
+	configs := s.clientSvc.GetClientConfigs(context.Background())
+	if cfg, ok := configs[client]; ok {
+		return cfg.Schema
+	}
+	return client
+}
+
 const (
 	featurePresetFilter = "PRESET_FILTER"
 	featurePresetQuery  = "PRESET_QUERY"
@@ -19,23 +35,23 @@ const (
 
 // PresetService handles preset filter and query CRUD via the app data table.
 type PresetService struct {
-	appData       map[string]*repository.AppDataRepository
-	clientConfigs map[string]model.ClientConfig
+	pool      *ConnectionPool
+	clientSvc *ClientService
 }
 
 func NewPresetService(
-	appData map[string]*repository.AppDataRepository,
-	clientConfigs map[string]model.ClientConfig,
+	pool *ConnectionPool,
+	clientSvc *ClientService,
 ) *PresetService {
 	return &PresetService{
-		appData:       appData,
-		clientConfigs: clientConfigs,
+		pool:      pool,
+		clientSvc: clientSvc,
 	}
 }
 
 // EnsureTables creates the app data table for each client connection.
 func (s *PresetService) EnsureTables(ctx context.Context) error {
-	for name, repo := range s.appData {
+	for name, repo := range s.pool.AllAppDataRepos() {
 		if err := repo.EnsureTable(ctx); err != nil {
 			return fmt.Errorf("ensure app data table for %s: %w", name, err)
 		}
@@ -46,9 +62,9 @@ func (s *PresetService) EnsureTables(ctx context.Context) error {
 // --- Preset Filters ---
 
 func (s *PresetService) ListPresetFilters(ctx context.Context, client, table string) ([]model.PresetFilterResponse, error) {
-	repo, ok := s.appData[client]
-	if !ok {
-		return nil, fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return nil, err
 	}
 	rows, err := repo.List(ctx, featurePresetFilter, client, table)
 	if err != nil {
@@ -66,9 +82,9 @@ func (s *PresetService) ListPresetFilters(ctx context.Context, client, table str
 }
 
 func (s *PresetService) SavePresetFilter(ctx context.Context, client, table string, req model.SavePresetFilterRequest) error {
-	repo, ok := s.appData[client]
-	if !ok {
-		return fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return err
 	}
 	if req.Name == "" {
 		return fmt.Errorf("name is required")
@@ -88,9 +104,9 @@ func (s *PresetService) SavePresetFilter(ctx context.Context, client, table stri
 }
 
 func (s *PresetService) DeletePresetFilter(ctx context.Context, client, table, name string) error {
-	repo, ok := s.appData[client]
-	if !ok {
-		return fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return err
 	}
 	return repo.Delete(ctx, featurePresetFilter, client, table, name)
 }
@@ -98,31 +114,31 @@ func (s *PresetService) DeletePresetFilter(ctx context.Context, client, table, n
 // --- Preset Queries ---
 
 func (s *PresetService) ListPresetQueries(ctx context.Context, client, table string) ([]model.PresetQueryResponse, error) {
-	repo, ok := s.appData[client]
-	if !ok {
-		return nil, fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return nil, err
 	}
 	rows, err := repo.List(ctx, featurePresetQuery, client, table)
 	if err != nil {
 		return nil, err
 	}
-	cfg := s.clientConfigs[client]
+	schema := s.getSchema(client)
 	var result []model.PresetQueryResponse
 	for _, row := range rows {
 		var q model.PresetQueryResponse
 		if err := json.Unmarshal([]byte(row.Data), &q); err != nil {
 			continue
 		}
-		q.Query = strings.ReplaceAll(q.Query, "{THIS_TABLE}", cfg.Schema+"."+table)
+		q.Query = strings.ReplaceAll(q.Query, "{THIS_TABLE}", schema+"."+table)
 		result = append(result, q)
 	}
 	return result, nil
 }
 
 func (s *PresetService) SavePresetQuery(ctx context.Context, client, table string, req model.SavePresetQueryRequest) error {
-	repo, ok := s.appData[client]
-	if !ok {
-		return fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return err
 	}
 	if req.Name == "" {
 		return fmt.Errorf("name is required")
@@ -149,9 +165,9 @@ func (s *PresetService) SavePresetQuery(ctx context.Context, client, table strin
 }
 
 func (s *PresetService) DeletePresetQuery(ctx context.Context, client, table, name string) error {
-	repo, ok := s.appData[client]
-	if !ok {
-		return fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return err
 	}
 	return repo.Delete(ctx, featurePresetQuery, client, table, name)
 }
@@ -195,9 +211,9 @@ func (s *PresetService) ValidateQuery(_ context.Context, req model.ValidateQuery
 
 // ResolvePresetQuery resolves a preset query by name, replacing {THIS_TABLE} and returning the resolved SQL.
 func (s *PresetService) ResolvePresetQuery(ctx context.Context, client, table, name string) (model.PresetQueryResponse, error) {
-	repo, ok := s.appData[client]
-	if !ok {
-		return model.PresetQueryResponse{}, fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return model.PresetQueryResponse{}, err
 	}
 	row, err := repo.Get(ctx, featurePresetQuery, client, table, name)
 	if err != nil {
@@ -207,17 +223,17 @@ func (s *PresetService) ResolvePresetQuery(ctx context.Context, client, table, n
 	if err := json.Unmarshal([]byte(row.Data), &q); err != nil {
 		return model.PresetQueryResponse{}, err
 	}
-	cfg := s.clientConfigs[client]
-	q.Query = strings.ReplaceAll(q.Query, "{THIS_TABLE}", cfg.Schema+"."+table)
+	schema := s.getSchema(client)
+	q.Query = strings.ReplaceAll(q.Query, "{THIS_TABLE}", schema+"."+table)
 	return q, nil
 }
 
 // --- Field Descriptions ---
 
 func (s *PresetService) GetFieldDescriptions(ctx context.Context, client, table string) (map[string]string, error) {
-	repo, ok := s.appData[client]
-	if !ok {
-		return nil, fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return nil, err
 	}
 	row, err := repo.Get(ctx, featureFieldDesc, client, table, "descriptions")
 	if err != nil {
@@ -232,9 +248,9 @@ func (s *PresetService) GetFieldDescriptions(ctx context.Context, client, table 
 }
 
 func (s *PresetService) SaveFieldDescriptions(ctx context.Context, client, table string, descs map[string]string) error {
-	repo, ok := s.appData[client]
-	if !ok {
-		return fmt.Errorf("client not found: %s", client)
+	repo, err := s.getAppRepo(client)
+	if err != nil {
+		return err
 	}
 	data, err := json.Marshal(descs)
 	if err != nil {

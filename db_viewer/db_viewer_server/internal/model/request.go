@@ -32,6 +32,40 @@ type RecentTouchRequest struct {
 	Key string `json:"key"`
 }
 
+type SaveClientRequest struct {
+	Name        string   `json:"name"`
+	DisplayName string   `json:"display_name"`
+	Host        string   `json:"host"`
+	Port        int      `json:"port"`
+	ServiceName string   `json:"service_name"`
+	Username    string   `json:"username"`
+	Password    string   `json:"password"`
+	Tables      []string `json:"tables"`
+}
+
+type TestConnectionRequest struct {
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	ServiceName string `json:"service_name"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+}
+
+type AcquireLockRequest struct {
+	ResourceType string `json:"resource_type"`
+	ResourceID   string `json:"resource_id"`
+	ScopeClient  string `json:"scope_client"`
+	SessionID    string `json:"session_id"`
+}
+
+type RenewLockRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+type ReleaseLockRequest struct {
+	SessionID string `json:"session_id"`
+}
+
 type SavePresetFilterRequest struct {
 	Name    string   `json:"name"`
 	Details string   `json:"details"`
