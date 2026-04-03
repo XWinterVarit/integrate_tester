@@ -13,10 +13,11 @@ interface ColumnInfoContentProps {
   columnName: string;
   columnMeta: Record<string, any> | null;
   constraints: Record<string, any>[];
+  description?: string;
 }
 
 export const ColumnInfoContent: React.FC<ColumnInfoContentProps> = ({
-  columnName, columnMeta, constraints,
+  columnName, columnMeta, constraints, description,
 }) => {
   const relatedConstraints = constraints.filter(
     (c) => String(c.COLUMNS || '').split(',').map((s: string) => s.trim()).includes(columnName)
@@ -62,6 +63,17 @@ export const ColumnInfoContent: React.FC<ColumnInfoContentProps> = ({
               <strong>{c.CONSTRAINT_NAME}</strong> ({c.CONSTRAINT_TYPE}) — {c.STATUS}
             </div>
           ))}
+        </div>
+      )}
+
+      {description && (
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+            Description
+          </div>
+          <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.5, color: 'var(--text-primary)' }}>
+            {description}
+          </div>
         </div>
       )}
     </div>

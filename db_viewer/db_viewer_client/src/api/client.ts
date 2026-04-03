@@ -145,4 +145,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ key }),
     }),
+
+  // Field Descriptions
+  getFieldDescriptions: (client: string, table: string) =>
+    request<Record<string, string>>(`/api/clients/${client}/tables/${table}/field-descriptions`),
+  saveFieldDescriptions: (client: string, table: string, descs: Record<string, string>) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/field-descriptions`, {
+      method: 'PUT',
+      body: JSON.stringify(descs),
+    }),
 };

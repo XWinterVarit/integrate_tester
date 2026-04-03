@@ -17,17 +17,19 @@ interface TransposeViewProps {
   onRowClick: (row: Row) => void;
   onDeleteRow: (row: Row) => void;
   onCloneRow: (row: Row) => void;
+  fieldDescriptions?: Record<string, string>;
 }
 
 interface TooltipState {
   meta: Record<string, any>;
   colName: string;
+  description?: string;
   x: number;
   y: number;
 }
 
 const TransposeView: React.FC<TransposeViewProps> = ({
-  rows, allColumns, filterColumns, columnMeta, sortCol, sortDir, onColumnClick, onSortClick, onFieldClick, onRowClick, onDeleteRow, onCloneRow,
+  rows, allColumns, filterColumns, columnMeta, sortCol, sortDir, onColumnClick, onSortClick, onFieldClick, onRowClick, onDeleteRow, onCloneRow, fieldDescriptions,
 }) => {
   const { scrollRef, wrapperClass } = useScrollShadow();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -83,7 +85,7 @@ const TransposeView: React.FC<TransposeViewProps> = ({
 
   const handleMouseEnter = (e: React.MouseEvent, meta: Record<string, any>, colName: string) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setTooltip({ meta, colName, x: rect.left, y: rect.bottom + 4 });
+    setTooltip({ meta, colName, description: fieldDescriptions?.[colName], x: rect.left, y: rect.bottom + 4 });
   };
 
   const handleMouseLeave = () => setTooltip(null);
@@ -224,11 +226,19 @@ const TransposeView: React.FC<TransposeViewProps> = ({
               {tooltip.meta.NULLABLE === 'N' ? 'Yes' : 'No'}
             </span>
           </div>
+          {tooltip.description && (
+            <div className="col-tooltip-row col-tooltip-desc">
+              <span className="col-tooltip-label">Desc</span>
+              <span className="col-tooltip-value">
+                {tooltip.description}
+              </span>
+            </div>
+          )}
         </div>,
         document.body
       )}
-    </>
-  );
-};
+      </>
+    );
+  };
 
-export default TransposeView;
+  export default TransposeView;

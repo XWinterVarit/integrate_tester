@@ -15,6 +15,7 @@ import PresetQueryPanel from './components/query/PresetQueryPanel';
 import PresetQueryContent from './components/query/PresetQueryContent';
 import ExportButton from './components/export/ExportButton';
 import Toast, { ToastMessage } from './components/ui/Toast';
+import FieldDescEditor from './components/field/FieldDescEditor';
 
 // Per-table state that should be remembered when switching tables
 interface TableState {
@@ -52,6 +53,8 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [slowQuery, setSlowQuery] = useState(false);
   const [error, setError] = useState('');
+  const [fieldDescriptions, setFieldDescriptions] = useState<Record<string, string>>({});
+  const [fieldDescTarget, setFieldDescTarget] = useState<string | null>(null);
 
   // Query params
   const [where, setWhere] = useState('');
@@ -124,14 +127,16 @@ const App: React.FC = () => {
     setError('');
     const t0 = Date.now();
     try {
-      const [colData, filterData, presetData] = await Promise.all([
+      const [colData, filterData, presetData, descData] = await Promise.all([
         api.getColumns(selectedClient, selectedTable),
         api.listPresetFilters(selectedClient, selectedTable),
         api.listPresetQueries(selectedClient, selectedTable),
+        api.getFieldDescriptions(selectedClient, selectedTable).catch(() => ({})),
       ]);
       setColumnMeta(colData || []);
       setFilters(filterData || []);
       setPresetQueries(presetData || []);
+      setFieldDescriptions(descData || {});
 
       // Fetch total row count
       const countData = await api.getRowCount(selectedClient, selectedTable);
@@ -311,6 +316,19 @@ const App: React.FC = () => {
         selectedClient={selectedClient}
         selectedTable={selectedTable}
         onSelectClient={setSelectedClient}
+        onShowTableInfo={async (t: string) => {
+          try {
+            const [sizeData, conData, idxData] = await Promise.all([
+              api.getTableSize(selectedClient, t),
+              api.getConstraints(selectedClient, t),
+              api.getIndexes(selectedClient, t),
+            ]);
+            addFloating(`Table: ${t}`, 'table-info', { size: sizeData, constraints: conData, indexes: idxData });
+          } catch (e: any) {
+            addToast('error', e.message || 'Failed to load table info');
+          }
+        }}
+        onShowFieldDesc={(t: string) => setFieldDescTarget(t)}
         onSelectTable={(t: string) => {
           // Save current table's state
           if (selectedTable) {
@@ -444,6 +462,7 @@ const App: React.FC = () => {
                 onFieldClick={handleFieldClick}
                 onDeleteRow={handleDeleteRow}
                 onCloneRow={handleCloneRow}
+                fieldDescriptions={fieldDescriptions}
               />
             ) : (
               <TransposeView
@@ -459,6 +478,7 @@ const App: React.FC = () => {
                 onRowClick={handleRowClick}
                 onDeleteRow={handleDeleteRow}
                 onCloneRow={handleCloneRow}
+                fieldDescriptions={fieldDescriptions}
               />
             )}
           </>
@@ -474,6 +494,7 @@ const App: React.FC = () => {
               columnName={win.content.colName}
               columnMeta={win.content.meta}
               constraints={constraints}
+              description={fieldDescriptions[win.content.colName]}
             />
           )}
           {win.type === 'field-edit' && (
@@ -537,6 +558,19 @@ const App: React.FC = () => {
         </FloatingWindow>
       ))}
       <Toast messages={toasts} onDismiss={dismissToast} />
+
+      {fieldDescTarget && (
+        <FieldDescEditor
+          client={selectedClient}
+          table={fieldDescTarget}
+          columns={allColumns}
+          presetFilters={filters}
+          onClose={() => {
+            setFieldDescTarget(null);
+            loadTableData();
+          }}
+        />
+      )}
     </div>
   );
 };

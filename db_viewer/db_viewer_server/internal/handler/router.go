@@ -83,6 +83,10 @@ func NewRouter(svc *service.TableService, presetSvc *service.PresetService) http
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/preset-queries/{name}/resolve", presetH.ResolveQuery)
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/validate-query", presetH.ValidateQuery)
 
+	// Field description routes
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/field-descriptions", presetH.GetFieldDescriptions)
+	mux.HandleFunc("PUT /api/clients/{client}/tables/{table}/field-descriptions", presetH.SaveFieldDescriptions)
+
 	// Export routes
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/export", exportH.Export)
 

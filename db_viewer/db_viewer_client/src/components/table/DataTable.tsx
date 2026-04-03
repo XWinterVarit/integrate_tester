@@ -7,6 +7,7 @@ import { useScrollShadow } from '../../hooks/useScrollShadow';
 interface TooltipState {
   meta: Record<string, any>;
   colName: string;
+  description?: string;
   x: number;
   y: number;
 }
@@ -25,10 +26,11 @@ interface DataTableProps {
   onFieldClick: (row: Row, colName: string) => void;
   onDeleteRow: (row: Row) => void;
   onCloneRow: (row: Row) => void;
+  fieldDescriptions?: Record<string, string>;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
-  rows, columns, filterItems, pageOffset, columnMeta, sortCol, sortDir, onRowClick, onColumnClick, onSortClick, onFieldClick, onDeleteRow, onCloneRow,
+  rows, columns, filterItems, pageOffset, columnMeta, sortCol, sortDir, onRowClick, onColumnClick, onSortClick, onFieldClick, onDeleteRow, onCloneRow, fieldDescriptions,
 }) => {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
@@ -40,8 +42,8 @@ const DataTable: React.FC<DataTableProps> = ({
 
   const handleThMouseEnter = useCallback((e: React.MouseEvent, meta: Record<string, any>, colName: string) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setTooltip({ meta, colName, x: rect.left, y: rect.bottom + 4 });
-  }, []);
+    setTooltip({ meta, colName, description: fieldDescriptions?.[colName], x: rect.left, y: rect.bottom + 4 });
+  }, [fieldDescriptions]);
 
   const handleThMouseLeave = useCallback(() => setTooltip(null), []);
 
@@ -240,6 +242,14 @@ const DataTable: React.FC<DataTableProps> = ({
             {tooltip.meta.NULLABLE === 'N' ? 'Yes' : 'No'}
           </span>
         </div>
+        {tooltip.description && (
+          <div className="col-tooltip-row col-tooltip-desc">
+            <span className="col-tooltip-label">Desc</span>
+            <span className="col-tooltip-value">
+              {tooltip.description}
+            </span>
+          </div>
+        )}
       </div>,
       document.body
     )}
