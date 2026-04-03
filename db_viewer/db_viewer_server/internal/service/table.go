@@ -178,6 +178,14 @@ func (s *TableService) BuildDeleteQuery(client, table, rowid string) (string, er
 	return repo.BuildDeleteQuery(table, rowid), nil
 }
 
+func (s *TableService) BuildUpdateQuery(client, table, column, value, rowid string) (string, error) {
+	repo, err := s.getRepo(client)
+	if err != nil {
+		return "", err
+	}
+	return repo.BuildUpdateQuery(table, column, value, rowid), nil
+}
+
 func (s *TableService) BuildInsertQuery(client, table string, columns, values []string) (string, error) {
 	repo, err := s.getRepo(client)
 	if err != nil {

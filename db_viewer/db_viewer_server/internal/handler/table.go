@@ -170,6 +170,26 @@ func (h *TableHandler) BuildDeleteQuery(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, map[string]string{"query": query})
 }
 
+func (h *TableHandler) BuildUpdateQuery(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
+	column := r.URL.Query().Get("column")
+	value := r.URL.Query().Get("value")
+	rowid := r.URL.Query().Get("rowid")
+
+	if column == "" || rowid == "" {
+		writeError(w, "missing column or rowid", http.StatusBadRequest)
+		return
+	}
+
+	query, err := h.svc.BuildUpdateQuery(client, table, column, value, rowid)
+	if err != nil {
+		writeError(w, fmt.Sprintf("error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"query": query})
+}
+
 func (h *TableHandler) BuildInsertQuery(w http.ResponseWriter, r *http.Request) {
 	client := r.PathValue("client")
 	table := r.PathValue("table")

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PresetQuery } from '../../types';
 interface PresetQueryPanelProps {
   presets: PresetQuery[];
@@ -18,6 +18,19 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, act
   const allPresets = [defaultQuery, ...presets];
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
   const filtered = allPresets.filter(
     (p) => p.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -37,7 +50,7 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({ presets, table, act
   };
   return (
     <div>
-      <div className="preset-dropdown" style={{ display: 'inline-block' }}>
+      <div className="preset-dropdown" style={{ display: 'inline-block' }} ref={containerRef}>
         <button className="secondary" onClick={() => setOpen(!open)}>
           Preset Queries
         </button>

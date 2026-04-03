@@ -98,6 +98,11 @@ export const api = {
   buildDeleteQuery: (client: string, table: string, rowid: string) =>
     request<{ query: string }>(`/api/clients/${client}/tables/${table}/rows/delete-query?rowid=${encodeURIComponent(rowid)}`),
 
+  buildUpdateQuery: (client: string, table: string, params: { column: string; value: string; rowid: string }) => {
+    const qs = new URLSearchParams(params).toString();
+    return request<{ query: string }>(`/api/clients/${client}/tables/${table}/rows/update-query?${qs}`);
+  },
+
   buildInsertQuery: (client: string, table: string, body: { columns: string[]; values: string[] }) =>
     request<{ query: string }>(`/api/clients/${client}/tables/${table}/rows/insert-query`, {
       method: 'POST',

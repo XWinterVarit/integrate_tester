@@ -97,9 +97,18 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [updateQuery, setUpdateQuery] = useState('');
 
+  const rowid = String(row['ROWID'] || '');
   const blobCols: string[] = row['__blob_columns'] || [];
   const isBlob = blobCols.includes(columnName);
+
+  React.useEffect(() => {
+    if (isBlob || !rowid) return;
+    api.buildUpdateQuery(client, table, { column: columnName, value: editValue, rowid })
+      .then((res) => setUpdateQuery(res.query))
+      .catch(() => setUpdateQuery('-- error building query --'));
+  }, [client, table, columnName, editValue, rowid, isBlob]);
 
   const blobStr = String(value ?? '');
   const isTruncated = blobStr.endsWith('...');
@@ -112,7 +121,7 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
       await api.updateCell(client, table, {
         column: columnName,
         value: editValue,
-        rowid: String(row['ROWID'] || ''),
+        rowid,
       });
       if (onSaved) {
         onSaved(columnName, editValue, row);
@@ -221,12 +230,16 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
               onChange={(e) => setEditValue(e.target.value)}
             />
           </div>
+          <div className="delete-query-preview" style={{ marginBottom: 12 }}>
+            <div className="delete-query-label">UPDATE Query:</div>
+            <pre className="delete-query-sql">{updateQuery || '-- loading... --'}</pre>
+          </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={handleSave} disabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </button>
             {message && (
-              <span style={{ fontSize: 12, color: 'var(--danger)' }}>
+              <span style={{ fontSize: 12, color: message.startsWith('✓') ? 'var(--success, green)' : 'var(--danger)' }}>
                 {message}
               </span>
             )}

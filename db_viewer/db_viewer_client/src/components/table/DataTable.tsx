@@ -75,7 +75,10 @@ const DataTable: React.FC<DataTableProps> = ({
   React.useEffect(() => {
     if (openMenuIdx === null) return;
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        // If clicking another row-menu-btn, let its onClick handle the toggle
+        if ((target as HTMLElement).closest?.('.row-menu-btn')) return;
         setOpenMenuIdx(null);
       }
     };
@@ -220,9 +223,15 @@ const DataTable: React.FC<DataTableProps> = ({
         <div className="col-tooltip-row">
           <span className="col-tooltip-label">Type</span>
           <span className="col-tooltip-value">
-            {tooltip.meta.DATA_LENGTH != null
-              ? `${tooltip.meta.DATA_TYPE}(${tooltip.meta.DATA_LENGTH})`
-              : tooltip.meta.DATA_TYPE}
+            {(() => {
+              const t = tooltip.meta.DATA_TYPE as string;
+              const p = tooltip.meta.DATA_PRECISION;
+              const s = tooltip.meta.DATA_SCALE;
+              const l = tooltip.meta.DATA_LENGTH;
+              if (p != null) return s != null ? `${t}(${p},${s})` : `${t}(${p})`;
+              if (/CHAR|RAW|BINARY/i.test(t) && l != null) return `${t}(${l})`;
+              return t;
+            })()}
           </span>
         </div>
         <div className="col-tooltip-row">

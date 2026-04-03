@@ -63,7 +63,7 @@ func (r *OracleRepository) ExecuteRawQuery(ctx context.Context, query string, ar
 }
 
 func (r *OracleRepository) GetColumns(ctx context.Context, table string) ([]map[string]any, error) {
-	query := `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE, DATA_DEFAULT
+	query := `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE, DATA_DEFAULT
 		FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :1 ORDER BY COLUMN_ID`
 	return r.executeQueryWithArgs(ctx, query, []any{table})
 }
@@ -179,6 +179,11 @@ func (r *OracleRepository) InsertRow(ctx context.Context, table string, columns,
 
 func (r *OracleRepository) BuildDeleteQuery(table, rowid string) string {
 	return fmt.Sprintf("DELETE FROM %s.%s WHERE ROWID = '%s'", r.schema, table, rowid)
+}
+
+func (r *OracleRepository) BuildUpdateQuery(table, column, value, rowid string) string {
+	escaped := strings.ReplaceAll(value, "'", "''")
+	return fmt.Sprintf("UPDATE %s.%s SET %s = '%s' WHERE ROWID = '%s'", r.schema, table, column, escaped, rowid)
 }
 
 func (r *OracleRepository) BuildInsertQuery(table string, columns, values []string) string {

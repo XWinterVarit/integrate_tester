@@ -62,6 +62,7 @@ func NewRouter(svc *service.TableService) http.Handler {
 	mux.HandleFunc("DELETE /api/clients/{client}/tables/{table}/rows/delete", tableH.DeleteRow)
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/rows/insert", tableH.InsertRow)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/rows/delete-query", tableH.BuildDeleteQuery)
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/rows/update-query", tableH.BuildUpdateQuery)
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/rows/insert-query", tableH.BuildInsertQuery)
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/blob", tableH.DownloadBlob)
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/blob", tableH.UploadBlob)
