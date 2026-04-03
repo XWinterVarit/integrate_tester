@@ -18,10 +18,15 @@ type PresetQueryArgResponse struct {
 }
 
 type PresetQueryResponse struct {
-	Index     int                      `json:"index"`
 	Name      string                   `json:"name"`
 	Query     string                   `json:"query"`
 	Arguments []PresetQueryArgResponse `json:"arguments"`
+}
+
+type ValidateQueryResponse struct {
+	Valid         bool     `json:"valid"`
+	Error         string   `json:"error,omitempty"`
+	UndefinedArgs []string `json:"undefined_args,omitempty"`
 }
 
 type ResolvedQueryResponse struct {

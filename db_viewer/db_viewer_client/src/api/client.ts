@@ -45,19 +45,44 @@ export const api = {
   getRowCount: (client: string, table: string) =>
     request<{ count: number }>(`/api/clients/${client}/tables/${table}/count`),
 
-  getFilters: (client: string, table: string) =>
-    request<{ name: string; details: string; columns: string[] }[]>(`/api/clients/${client}/tables/${table}/filters`),
+  // Preset Filters
+  listPresetFilters: (client: string, table: string) =>
+    request<{ name: string; details: string; columns: string[] }[]>(`/api/clients/${client}/tables/${table}/preset-filters`),
+  savePresetFilter: (client: string, table: string, body: { name: string; details: string; columns: string[] }) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/preset-filters`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deletePresetFilter: (client: string, table: string, name: string) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/preset-filters/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }),
 
-  getPresetQueries: (client: string, table: string) =>
-    request<{ index: number; name: string; query: string; arguments: { name: string; type: string; description: string }[] }[]>(
+  // Preset Queries
+  listPresetQueries: (client: string, table: string) =>
+    request<{ name: string; query: string; arguments: { name: string; type: string; description: string }[] }[]>(
       `/api/clients/${client}/tables/${table}/preset-queries`
     ),
-
-  resolvePresetQuery: (client: string, table: string, index: number, args: Record<string, string>) =>
-    request<{ resolved_query: string }>(`/api/clients/${client}/tables/${table}/preset-queries/${index}/resolve`, {
+  savePresetQuery: (client: string, table: string, body: { name: string; query: string; arguments: { name: string; type: string; description: string }[] }) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/preset-queries`, {
       method: 'POST',
-      body: JSON.stringify({ args }),
+      body: JSON.stringify(body),
     }),
+  deletePresetQuery: (client: string, table: string, name: string) =>
+    request<{ status: string }>(`/api/clients/${client}/tables/${table}/preset-queries/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }),
+  resolvePresetQuery: (client: string, table: string, name: string) =>
+    request<{ name: string; query: string; arguments: { name: string; type: string; description: string }[] }>(
+      `/api/clients/${client}/tables/${table}/preset-queries/${encodeURIComponent(name)}/resolve`
+    ),
+  validateQuery: (client: string, table: string, body: { query: string; arguments: { name: string; type: string; description: string }[] }) =>
+    request<{ valid: boolean; error?: string; undefined_args?: string[] }>(
+      `/api/clients/${client}/tables/${table}/validate-query`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }
+    ),
 
   exportTable: (client: string, table: string, params: Record<string, string>) => {
     const qs = new URLSearchParams(params).toString();

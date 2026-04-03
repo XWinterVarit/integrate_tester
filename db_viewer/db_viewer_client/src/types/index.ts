@@ -16,7 +16,6 @@ export interface PresetQueryArg {
 }
 
 export interface PresetQuery {
-  index: number;
   name: string;
   query: string;
   arguments: PresetQueryArg[];

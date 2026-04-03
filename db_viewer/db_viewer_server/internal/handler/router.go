@@ -38,7 +38,7 @@ func timeoutMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func NewRouter(svc *service.TableService) http.Handler {
+func NewRouter(svc *service.TableService, presetSvc *service.PresetService) http.Handler {
 	mux := http.NewServeMux()
 
 	clientH := NewClientHandler(svc)
@@ -46,6 +46,7 @@ func NewRouter(svc *service.TableService) http.Handler {
 	queryH := NewQueryHandler(svc)
 	exportH := NewExportHandler(svc)
 	recentH := NewRecentHandler(svc)
+	presetH := NewPresetHandler(presetSvc)
 
 	// Client routes
 	mux.HandleFunc("GET /api/clients", clientH.List)
@@ -69,9 +70,18 @@ func NewRouter(svc *service.TableService) http.Handler {
 
 	// Query routes
 	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/query", queryH.Execute)
-	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/filters", queryH.GetFilters)
-	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/preset-queries", queryH.GetPresetQueries)
-	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/preset-queries/{index}/resolve", queryH.ResolvePresetQuery)
+
+	// Preset filter routes
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/preset-filters", presetH.ListFilters)
+	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/preset-filters", presetH.SaveFilter)
+	mux.HandleFunc("DELETE /api/clients/{client}/tables/{table}/preset-filters/{name}", presetH.DeleteFilter)
+
+	// Preset query routes
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/preset-queries", presetH.ListQueries)
+	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/preset-queries", presetH.SaveQuery)
+	mux.HandleFunc("DELETE /api/clients/{client}/tables/{table}/preset-queries/{name}", presetH.DeleteQuery)
+	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/preset-queries/{name}/resolve", presetH.ResolveQuery)
+	mux.HandleFunc("POST /api/clients/{client}/tables/{table}/validate-query", presetH.ValidateQuery)
 
 	// Export routes
 	mux.HandleFunc("GET /api/clients/{client}/tables/{table}/export", exportH.Export)

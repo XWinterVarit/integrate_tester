@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -30,6 +31,7 @@ func main() {
 	}
 
 	repos := make(map[string]*repository.OracleRepository)
+	appDataRepos := make(map[string]*repository.AppDataRepository)
 	clientConfigs := make(map[string]model.ClientConfig)
 
 	for _, c := range cfg.Clients {
@@ -45,6 +47,7 @@ func main() {
 		db.SetMaxIdleConns(5)
 
 		repos[c.Name] = repository.NewOracle(db, c.Schema)
+		appDataRepos[c.Name] = repository.NewAppDataRepository(db)
 		clientConfigs[c.Name] = c
 	}
 
@@ -52,7 +55,13 @@ func main() {
 	recentQueries := tracker.New()
 
 	svc := service.NewTableService(repos, clientConfigs, recentFilters, recentQueries)
-	router := handler.NewRouter(svc)
+	presetSvc := service.NewPresetService(appDataRepos, clientConfigs)
+
+	if err := presetSvc.EnsureTables(context.Background()); err != nil {
+		log.Printf("Warning: failed to ensure app data tables: %v", err)
+	}
+
+	router := handler.NewRouter(svc, presetSvc)
 	srv := middleware.CORS(cfg.Server.CORSOrigin, router)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

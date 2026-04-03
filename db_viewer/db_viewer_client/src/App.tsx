@@ -126,8 +126,8 @@ const App: React.FC = () => {
     try {
       const [colData, filterData, presetData] = await Promise.all([
         api.getColumns(selectedClient, selectedTable),
-        api.getFilters(selectedClient, selectedTable),
-        api.getPresetQueries(selectedClient, selectedTable),
+        api.listPresetFilters(selectedClient, selectedTable),
+        api.listPresetQueries(selectedClient, selectedTable),
       ]);
       setColumnMeta(colData || []);
       setFilters(filterData || []);
@@ -158,11 +158,14 @@ const App: React.FC = () => {
       }
 
       setRows(rowData || []);
-      setAllColumns(
-        rowData && rowData.length > 0
-          ? Object.keys(rowData[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns')
-          : (colData || []).map((c: any) => c.COLUMN_NAME)
-      );
+      // Sort columns by table structure order (columnMeta) instead of alphabetically
+      const metaOrder = (colData || []).map((c: any) => c.COLUMN_NAME as string);
+      const rawCols = rowData && rowData.length > 0
+        ? Object.keys(rowData[0]).filter((k) => k !== 'ROWID' && k !== '__blob_columns')
+        : metaOrder;
+      const orderMap = new Map(metaOrder.map((name: string, idx: number) => [name, idx]));
+      const sorted = [...rawCols].sort((a, b) => (orderMap.get(a) ?? 9999) - (orderMap.get(b) ?? 9999));
+      setAllColumns(sorted);
       addToast('success', `Loaded ${selectedTable}`, formatDuration(Date.now() - t0));
     } catch (e: any) {
       setError(e.message);
@@ -374,14 +377,20 @@ const App: React.FC = () => {
                 filters={filters}
                 activeFilter={activeFilter}
                 onSelect={handleFilterSelect}
+                client={selectedClient}
+                table={selectedTable}
+                allColumns={allColumns}
+                onRefresh={loadTableData}
               />
               <PresetQueryPanel
                 presets={presetQueries}
+                client={selectedClient}
                 table={selectedTable}
                 activePreset={activePresetQuery}
                 onExecute={handlePresetExecute}
                 onClear={() => { setActivePresetQuery(null); setActivePresetArgs({}); }}
                 onOpenPopup={(preset) => addFloating(`Preset: ${preset.name}`, 'preset-query', { preset })}
+                onRefresh={loadTableData}
               />
               <ExportButton
                 client={selectedClient}

@@ -32,6 +32,23 @@ type RecentTouchRequest struct {
 	Key string `json:"key"`
 }
 
+type SavePresetFilterRequest struct {
+	Name    string   `json:"name"`
+	Details string   `json:"details"`
+	Columns []string `json:"columns"`
+}
+
+type SavePresetQueryRequest struct {
+	Name      string                 `json:"name"`
+	Query     string                 `json:"query"`
+	Arguments []PresetQueryArgConfig `json:"arguments"`
+}
+
+type ValidateQueryRequest struct {
+	Query     string                 `json:"query"`
+	Arguments []PresetQueryArgConfig `json:"arguments"`
+}
+
 type RowQueryParams struct {
 	Select  string
 	Where   string
