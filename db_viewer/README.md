@@ -48,7 +48,7 @@ db_viewer/
 │   │   └── tracker/
 │   │       └── recent.go        # Recent usage tracker
 │   └── config.yml               # Example config
-├── frontend/
+├── db_viewer_client/
 │   ├── public/
 │   │   └── index.html
 │   ├── src/
@@ -148,7 +148,7 @@ clients:
 ### 1. Start the Backend
 
 ```bash
-cd db_viewer/backend
+cd db_viewer/db_viewer_server
 
 # Run directly
 go run ./cmd/main.go
@@ -162,7 +162,7 @@ The backend starts on `http://localhost:8080` by default.
 ### 2. Start the Frontend
 
 ```bash
-cd db_viewer/frontend
+cd db_viewer/db_viewer_client
 
 # Install dependencies
 npm install
