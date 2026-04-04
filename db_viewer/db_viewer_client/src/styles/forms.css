@@ -2,17 +2,34 @@
 .insert-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
 }
 
 .insert-form-fields {
-  max-height: 55vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding-right: 4px;
+  padding-bottom: 8px;
+}
+
+/* Sticky footer for insert form */
+.insert-sticky-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-secondary);
 }
 
 .insert-field-card {
@@ -100,8 +117,7 @@
 }
 
 .insert-query-preview {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  /* border/padding now handled by .insert-sticky-footer */
 }
 
 .insert-query-label,
@@ -154,7 +170,39 @@
 .delete-confirm {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* Scrollable middle section (warning + row data) */
+.delete-scrollable-middle {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  padding-bottom: 8px;
+}
+
+/* Sticky footer for delete confirm */
+.delete-sticky-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-secondary);
+}
+
+/* Remove double border when query preview is inside sticky footer */
+.delete-sticky-footer .delete-query-preview {
+  border-top: none;
+  padding-top: 0;
 }
 
 .delete-warning {

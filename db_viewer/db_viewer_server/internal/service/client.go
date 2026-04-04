@@ -17,6 +17,8 @@ import (
 var svcLog = logger.New("CLIENT_SVC")
 
 const featureClientConfig = "CLIENT_CONFIG"
+const featureClientOrder = "CLIENT_ORDER"
+const clientOrderKey = "default"
 
 // clientConfigJSON is the JSON stored in DATA column for CLIENT_CONFIG rows.
 type clientConfigJSON struct {
@@ -64,8 +66,57 @@ func (s *ClientService) ListClients(ctx context.Context) ([]model.ClientConfigRe
 			Tables:      cfg.Tables,
 		})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	applyClientOrder(result, s.GetClientOrder(ctx))
 	return result, nil
+}
+
+// GetClientOrder returns the saved client display order (names slice). Returns nil if not set.
+func (s *ClientService) GetClientOrder(ctx context.Context) []string {
+	row, err := s.adminRepo.GetByFeatureAndKey(ctx, featureClientOrder, clientOrderKey)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	if err := json.Unmarshal([]byte(row.Data), &names); err != nil {
+		return nil
+	}
+	return names
+}
+
+// ReorderClients persists the client display order.
+func (s *ClientService) ReorderClients(ctx context.Context, names []string) error {
+	data, err := json.Marshal(names)
+	if err != nil {
+		return err
+	}
+	return s.adminRepo.UpsertByFeatureAndKey(ctx, featureClientOrder, clientOrderKey, string(data))
+}
+
+// applyClientOrder sorts result in-place by the given ordered names.
+// Clients not in the order list are appended alphabetically after the ordered ones.
+func applyClientOrder(result []model.ClientConfigResponse, order []string) {
+	if len(order) == 0 {
+		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+		return
+	}
+	orderMap := make(map[string]int, len(order))
+	for i, name := range order {
+		orderMap[name] = i
+	}
+	sort.Slice(result, func(i, j int) bool {
+		ai, aok := orderMap[result[i].Name]
+		bi, bok := orderMap[result[j].Name]
+		if aok && bok {
+			return ai < bi
+		}
+		if aok {
+			return true
+		}
+		if bok {
+			return false
+		}
+		return result[i].Name < result[j].Name
+	})
 }
 
 func (s *ClientService) GetClient(ctx context.Context, name string) (model.ClientConfigResponse, error) {

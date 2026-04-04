@@ -73,6 +73,7 @@ func NewRouter(svc *service.TableService, presetSvc *service.PresetService, clie
 	// Client management routes
 	mux.HandleFunc("GET /api/manage/clients", clientMgmtH.ListClients)
 	mux.HandleFunc("POST /api/manage/clients", clientMgmtH.CreateClient)
+	mux.HandleFunc("PUT /api/manage/clients/order", clientMgmtH.ReorderClients)
 	mux.HandleFunc("PUT /api/manage/clients/{name}", clientMgmtH.UpdateClient)
 	mux.HandleFunc("DELETE /api/manage/clients/{name}", clientMgmtH.DeleteClient)
 	mux.HandleFunc("POST /api/manage/clients/test-connection", clientMgmtH.TestConnection)

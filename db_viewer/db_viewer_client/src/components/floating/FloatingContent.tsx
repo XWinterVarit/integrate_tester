@@ -86,7 +86,11 @@ interface FieldEditContentProps {
   client: string;
   table: string;
   row: Record<string, any>;
-  onSaved?: (columnName: string, newValue: string, row: Record<string, any>) => void;
+  onSaved?: (columnName: string, newValue: string, row: Record<string, any>, duration?: string) => void;
+}
+
+function fmtDuration(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
 const BLOB_DISPLAY_LIMIT = 500 * 1024; // 500 KB — show full content below this
@@ -129,6 +133,7 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
   const handleSave = async () => {
     setSaving(true);
     setMessage('');
+    const t0 = Date.now();
     try {
       await api.updateCell(client, table, {
         column: columnName,
@@ -136,7 +141,7 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
         rowid,
       });
       if (onSaved) {
-        onSaved(columnName, editValue, row);
+        onSaved(columnName, editValue, row, fmtDuration(Date.now() - t0));
       }
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
@@ -157,11 +162,12 @@ export const FieldEditContent: React.FC<FieldEditContentProps> = ({
     if (!uploadFile) return;
     setSaving(true);
     setMessage('');
+    const t0 = Date.now();
     try {
       const buf = await uploadFile.arrayBuffer();
       await api.uploadBlob(client, table, { column: columnName, rowid: String(row['ROWID'] || '') }, buf);
       setMessage('✓ Uploaded successfully');
-      setTimeout(() => { if (onSaved) onSaved(columnName, '', row); }, 800);
+      setTimeout(() => { if (onSaved) onSaved(columnName, '', row, fmtDuration(Date.now() - t0)); }, 800);
     } catch (e: any) {
       setMessage(`Error: ${e.message}`);
     } finally {

@@ -93,6 +93,19 @@ func (h *ClientMgmtHandler) ListAllTables(w http.ResponseWriter, r *http.Request
 	writeJSON(w, model.ListTablesFromDBResponse{Tables: tables})
 }
 
+func (h *ClientMgmtHandler) ReorderClients(w http.ResponseWriter, r *http.Request) {
+	var req model.ReorderClientsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if err := h.svc.ReorderClients(r.Context(), req.Names); err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, model.StatusResponse{Status: "ok"})
+}
+
 func (h *ClientMgmtHandler) ListTablesFromConnection(w http.ResponseWriter, r *http.Request) {
 	var req model.TestConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -184,6 +184,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  reorderClients: (names: string[]) =>
+    request<{ status: string }>('/api/manage/clients/order', {
+      method: 'PUT',
+      body: JSON.stringify({ names }),
+    }),
 
   // Locks
   acquireLock: (body: AcquireLockRequest) =>

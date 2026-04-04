@@ -43,6 +43,10 @@ type SaveClientRequest struct {
 	Tables      []string `json:"tables"`
 }
 
+type ReorderClientsRequest struct {
+	Names []string `json:"names"`
+}
+
 type TestConnectionRequest struct {
 	Host        string `json:"host"`
 	Port        int    `json:"port"`

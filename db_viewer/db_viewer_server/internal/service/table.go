@@ -37,12 +37,36 @@ func NewTableService(
 }
 
 func (s *TableService) ListClients() []model.ClientInfo {
-	configs := s.clientSvc.GetClientConfigs(context.Background())
-	result := make([]model.ClientInfo, 0)
+	ctx := context.Background()
+	configs := s.clientSvc.GetClientConfigs(ctx)
+	result := make([]model.ClientInfo, 0, len(configs))
 	for _, c := range configs {
 		result = append(result, model.ClientInfo{Name: c.Name, DisplayName: c.Name, Schema: c.Schema})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	// Apply saved order (same logic as ClientService.applyClientOrder but for ClientInfo)
+	order := s.clientSvc.GetClientOrder(ctx)
+	if len(order) > 0 {
+		orderMap := make(map[string]int, len(order))
+		for i, name := range order {
+			orderMap[name] = i
+		}
+		sort.Slice(result, func(i, j int) bool {
+			ai, aok := orderMap[result[i].Name]
+			bi, bok := orderMap[result[j].Name]
+			if aok && bok {
+				return ai < bi
+			}
+			if aok {
+				return true
+			}
+			if bok {
+				return false
+			}
+			return result[i].Name < result[j].Name
+		})
+	} else {
+		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	}
 	return result
 }
 

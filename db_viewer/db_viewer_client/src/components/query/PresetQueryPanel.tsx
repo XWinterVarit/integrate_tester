@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { PresetQuery } from '../../types';
 import { api } from '../../api/client';
 import QueryEditorPopup from './QueryEditorPopup';
@@ -20,10 +21,12 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [moreMenu, setMoreMenu] = useState<string | null>(null);
+  const [morePos, setMorePos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingQuery, setEditingQuery] = useState<PresetQuery | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const moreRef = useRef<HTMLDivElement | null>(null);
 
   const defaultQuery: PresetQuery = {
     name: 'Select All',
@@ -42,6 +45,18 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  // Close more-popover on outside click
+  useEffect(() => {
+    if (!moreMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moreMenu]);
 
   const filtered = presets.filter(
     (p) => p.name.toLowerCase().includes(search.toLowerCase())
@@ -124,49 +139,63 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({
         )}
         {open && (
           <div className="preset-dropdown-menu">
-            <input
-              className="search-input"
-              placeholder="Search presets..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
-
-            {/* Select All default */}
-            <div
-              className={`preset-dropdown-item${!activePreset ? ' active' : ''}`}
-              onClick={handleSelectAll}
-              style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}
-            >
-              Select All
+            {/* Sticky top: search */}
+            <div className="preset-dropdown-header">
+              <input
+                className="search-input"
+                placeholder="Search presets..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
             </div>
 
-            {filtered.map((p) => (
+            {/* Scrollable list */}
+            <div className="preset-dropdown-body">
+              {/* Select All default */}
               <div
-                key={p.name}
-                className={`preset-dropdown-item preset-dropdown-item-with-more${activePreset?.name === p.name ? ' active' : ''}`}
-                onClick={() => handleSelect(p)}
+                className={`preset-dropdown-item${!activePreset ? ' active' : ''}`}
+                onClick={handleSelectAll}
+                style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}
               >
-                <span style={{ flex: 1 }}>{p.name}</span>
-                <div
-                  className="more-icon"
-                  onClick={(e) => { e.stopPropagation(); setMoreMenu(moreMenu === p.name ? null : p.name); }}
-                >
-                  ···
-                </div>
-                {moreMenu === p.name && (
-                  <div className="more-popover">
-                    <div className="more-popover-item" onClick={(e) => { e.stopPropagation(); handleEdit(p); }}>✏️ Edit</div>
-                    <div className="more-popover-item" onClick={(e) => { e.stopPropagation(); handleDuplicate(p); }}>📄 Duplicate</div>
-                    <div className="more-popover-item danger" onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.name); setMoreMenu(null); }}>🗑 Delete</div>
-                  </div>
-                )}
+                Select All
               </div>
-            ))}
 
-            <div className="preset-dropdown-divider" />
-            <div className="preset-dropdown-item add-new" onClick={handleAddNew}>
-              ＋ Add New Query
+              {filtered.map((p) => (
+                <div
+                  key={p.name}
+                  className={`preset-dropdown-item preset-dropdown-item-with-more${activePreset?.name === p.name ? ' active' : ''}`}
+                  onClick={() => handleSelect(p)}
+                >
+                  <span style={{ flex: 1 }}>{p.name}</span>
+                  <div
+                    className="more-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      setMorePos({ top: rect.bottom + 2, left: rect.right - 110 });
+                      setMoreMenu(moreMenu === p.name ? null : p.name);
+                    }}
+                  >
+                    ···
+                  </div>
+                  {moreMenu === p.name && ReactDOM.createPortal(
+                    <div className="more-popover" ref={moreRef} style={{ position: 'fixed', top: morePos.top, left: morePos.left, zIndex: 9999 }}>
+                      <div className="more-popover-item" onClick={(e) => { e.stopPropagation(); handleEdit(p); }}>✏️ Edit</div>
+                      <div className="more-popover-item" onClick={(e) => { e.stopPropagation(); handleDuplicate(p); }}>📄 Duplicate</div>
+                      <div className="more-popover-item danger" onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.name); setMoreMenu(null); }}>🗑 Delete</div>
+                    </div>,
+                    document.body
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Sticky bottom: add new */}
+            <div className="preset-dropdown-footer">
+              <div className="preset-dropdown-item add-new" onClick={handleAddNew}>
+                ＋ Add New Query
+              </div>
             </div>
           </div>
         )}

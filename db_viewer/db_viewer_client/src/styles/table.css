@@ -137,9 +137,20 @@
 
 .floating-body {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding: 14px;
   font-size: 13px;
+  box-sizing: border-box;
+}
+
+/* Default: direct div children scroll as a whole (row-json, column-info, table-info, field-edit) */
+.floating-body > div {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .floating-body pre {
@@ -165,9 +176,25 @@
   box-shadow: var(--shadow);
   z-index: 100;
   min-width: 200px;
-  max-height: 260px;
+  max-height: min(420px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+}
+.preset-dropdown-header {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.preset-dropdown-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 3px 0;
+}
+.preset-dropdown-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 2px 0;
 }
 
 .preset-dropdown-item {

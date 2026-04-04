@@ -44,40 +44,44 @@ const DeleteConfirm: React.FC<DeleteConfirmProps> = ({ client, table, row, onDel
 
   return (
     <div className="delete-confirm">
-      <div className="delete-warning">
-        ⚠️ Are you sure you want to delete this row?
-      </div>
+      <div className="delete-scrollable-middle">
+        <div className="delete-warning">
+          ⚠️ Are you sure you want to delete this row?
+        </div>
 
-      <div className="delete-row-summary">
-        <div className="delete-summary-label">Row Data:</div>
-        <div className="delete-row-data">
-          {rowEntries.map(([k, v]) => (
-            <div key={k} className="delete-row-field">
-              <span className="delete-field-name">{k}:</span>
-              <span className="delete-field-value">
-                {v === null || v === undefined ? (
-                  <span className="null-value">null</span>
-                ) : String(v)}
-              </span>
-            </div>
-          ))}
+        <div className="delete-row-summary">
+          <div className="delete-summary-label">Row Data:</div>
+          <div className="delete-row-data">
+            {rowEntries.map(([k, v]) => (
+              <div key={k} className="delete-row-field">
+                <span className="delete-field-name">{k}:</span>
+                <span className="delete-field-value">
+                  {v === null || v === undefined ? (
+                    <span className="null-value">null</span>
+                  ) : String(v)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="delete-query-preview">
-        <div className="delete-query-label">DELETE Query:</div>
-        <pre className="delete-query-sql">{deleteQuery || '-- loading... --'}</pre>
-      </div>
+      <div className="delete-sticky-footer">
+        <div className="delete-query-preview">
+          <div className="delete-query-label">DELETE Query:</div>
+          <pre className="delete-query-sql">{deleteQuery || '-- loading... --'}</pre>
+        </div>
 
-      <div className="delete-actions">
-        <button className="delete-btn-confirm" onClick={handleDelete} disabled={deleting}>
-          {deleting ? 'Deleting...' : '🗑 Confirm Delete'}
-        </button>
-        {message && (
-          <span className={`delete-message ${message.startsWith('✓') ? 'success' : 'error'}`}>
-            {message}
-          </span>
-        )}
+        <div className="delete-actions">
+          <button className="delete-btn-confirm" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting...' : '🗑 Confirm Delete'}
+          </button>
+          {message && (
+            <span className={`delete-message ${message.startsWith('✓') ? 'success' : 'error'}`}>
+              {message}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

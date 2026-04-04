@@ -179,20 +179,22 @@ const InsertForm: React.FC<InsertFormProps> = ({
         })}
       </div>
 
-      <div className="insert-query-preview">
-        <div className="insert-query-label">Final INSERT Query</div>
-        <pre className="insert-query-sql">{insertQuery || '-- fill in values above --'}</pre>
-      </div>
+      <div className="insert-sticky-footer">
+        <div className="insert-query-preview">
+          <div className="insert-query-label">Final INSERT Query</div>
+          <pre className="insert-query-sql">{insertQuery || '-- fill in values above --'}</pre>
+        </div>
 
-      <div className="insert-actions">
-        <button className="secondary" onClick={handleSave} disabled={saving || hasBlobTooLarge}>
-          {saving ? 'Inserting...' : 'Insert Row'}
-        </button>
-        {message && (
-          <span className={`insert-message ${message.startsWith('✓') ? 'success' : 'error'}`}>
-            {message}
-          </span>
-        )}
+        <div className="insert-actions">
+          <button className="secondary" onClick={handleSave} disabled={saving || hasBlobTooLarge}>
+            {saving ? 'Inserting...' : 'Insert Row'}
+          </button>
+          {message && (
+            <span className={`insert-message ${message.startsWith('✓') ? 'success' : 'error'}`}>
+              {message}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

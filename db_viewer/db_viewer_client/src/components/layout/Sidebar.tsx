@@ -30,6 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [headerMenu, setHeaderMenu] = useState(false);
   const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [tableTooltip, setTableTooltip] = useState<{ text: string; top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
@@ -89,39 +90,54 @@ const Sidebar: React.FC<SidebarProps> = ({
     setHeaderMenu((prev) => !prev);
   };
 
+  const handleTableNameMouseEnter = (e: React.MouseEvent, tableName: string) => {
+    const el = e.currentTarget as HTMLElement;
+    if (el.scrollWidth > el.offsetWidth) {
+      const rect = el.getBoundingClientRect();
+      setTableTooltip({ text: tableName, top: rect.top + rect.height / 2, left: rect.right + 10 });
+    }
+  };
+
+  const handleTableNameMouseLeave = () => {
+    setTableTooltip(null);
+  };
+
   return (
     <>
       <div className="sidebar" style={{ width, minWidth: width }}>
-        <div className="sidebar-header sidebar-header-hoverable">
-          Connections
-          <span className="sidebar-header-more" onClick={handleHeaderMoreClick}>···</span>
-        </div>
-        {clients.map((c) => (
-          <div
-            key={c.name}
-            className={`sidebar-item ${selectedClient === c.name ? 'active' : ''}`}
-            onClick={() => onSelectClient(c.name)}
-          >
-            {c.name}
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 6 }}>
-              {c.schema}
-            </span>
-          </div>
-        ))}
-        {clients.length === 0 && (
-          <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>
-            No clients configured
-          </div>
-        )}
-        {selectedClient && (
-          <>
-            <div className="sidebar-header">Tables</div>
-            {tables.length === 0 && (
+        <div className="sidebar-scroll">
+          <div className="sidebar-section">
+            <div className="sidebar-header sidebar-header-hoverable">
+              Connections
+              <span className="sidebar-header-more" onClick={handleHeaderMoreClick}>⚙</span>
+            </div>
+            {clients.map((c) => (
+              <div
+                key={c.name}
+                className={`sidebar-item ${selectedClient === c.name ? 'active' : ''}`}
+                onClick={() => onSelectClient(c.name)}
+              >
+                {c.name}
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                  {c.schema}
+                </span>
+              </div>
+            ))}
+            {clients.length === 0 && (
               <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>
-                No tables configured
+                No clients configured
               </div>
             )}
-            {tables.map((t, idx) => {
+          </div>
+          {selectedClient && (
+            <div className="sidebar-section">
+              <div className="sidebar-header">Tables</div>
+              {tables.length === 0 && (
+                <div style={{ padding: '10px 16px', color: 'var(--text-secondary)', fontSize: 13 }}>
+                  No tables configured
+                </div>
+              )}
+              {tables.map((t, idx) => {
               if (t === '<SPACE>') {
                 return <div key={`space-${idx}`} className="sidebar-space" />;
               }
@@ -144,7 +160,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onSelectTable(t);
                   }}
                 >
-                  <span className="sidebar-table-name">{t}</span>
+                  <span
+                    className="sidebar-table-name"
+                    onMouseEnter={(e) => handleTableNameMouseEnter(e, t)}
+                    onMouseLeave={handleTableNameMouseLeave}
+                  >{t}</span>
                   <span
                     className="sidebar-more-icon"
                     onClick={(e) => handleMoreClick(e, t)}
@@ -154,8 +174,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </a>
               );
             })}
-          </>
-        )}
+            </div>
+          )}
+        </div>
       </div>
       <div className="pane-resize-handle" onMouseDown={handleMouseDown} />
 
@@ -211,6 +232,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             About
           </div>
+        </div>
+      )}
+
+      {tableTooltip && (
+        <div
+          className="sidebar-table-tooltip"
+          style={{ top: tableTooltip.top, left: tableTooltip.left }}
+        >
+          {tableTooltip.text}
         </div>
       )}
     </>

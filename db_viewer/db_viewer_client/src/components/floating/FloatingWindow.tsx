@@ -16,7 +16,9 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
   const resizeRef = useRef<{ startX: number; startY: number; origW: number; origH: number } | null>(null);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    document.body.style.userSelect = 'none';
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       setPos({
@@ -26,6 +28,7 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
     };
     const onUp = () => {
       dragRef.current = null;
+      document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
@@ -34,8 +37,10 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
   }, [pos]);
 
   const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     resizeRef.current = { startX: e.clientX, startY: e.clientY, origW: size.w, origH: size.h };
+    document.body.style.userSelect = 'none';
     const onMove = (ev: MouseEvent) => {
       if (!resizeRef.current) return;
       setSize({
@@ -45,6 +50,7 @@ const FloatingWindow: React.FC<FloatingWindowProps> = ({ window: win, onClose, o
     };
     const onUp = () => {
       resizeRef.current = null;
+      document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };

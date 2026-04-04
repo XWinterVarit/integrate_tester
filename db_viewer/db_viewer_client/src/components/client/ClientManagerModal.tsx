@@ -43,6 +43,9 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [showTrash, setShowTrash] = useState(false);
+  // Client list drag reorder
+  const [clientDragIdx, setClientDragIdx] = useState<number | null>(null);
+  const [clientDragOverIdx, setClientDragOverIdx] = useState<number | null>(null);
 
   const loadClients = useCallback(async () => {
     try {
@@ -264,6 +267,38 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
     }
   };
 
+  // Client list drag reorder handlers
+  const handleClientDragStart = (idx: number) => {
+    setClientDragIdx(idx);
+  };
+
+  const handleClientDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (clientDragIdx === null) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setClientDragOverIdx(e.clientY > rect.top + rect.height / 2 ? idx + 1 : idx);
+  };
+
+  const handleClientDrop = (insertBefore: number) => {
+    if (clientDragIdx === null) return;
+    setClients(prev => {
+      const items = [...prev];
+      const [moved] = items.splice(clientDragIdx, 1);
+      const adjustedIdx = clientDragIdx < insertBefore ? insertBefore - 1 : insertBefore;
+      items.splice(adjustedIdx, 0, moved);
+      // Persist order to backend (fire-and-forget; sidebar will refresh on next load)
+      api.reorderClients(items.map(c => c.name)).catch(() => {});
+      return items;
+    });
+    setClientDragIdx(null);
+    setClientDragOverIdx(null);
+  };
+
+  const handleClientDragEnd = () => {
+    setClientDragIdx(null);
+    setClientDragOverIdx(null);
+  };
+
   const slideClass = direction === 'forward' ? 'cm-slide-forward' : 'cm-slide-back';
 
   return (
@@ -279,8 +314,17 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
               </div>
               <div className="cm-panel-body">
                 <div className="cm-client-list">
-                  {clients.map(c => (
-                    <div key={c.name} className="cm-client-row">
+                  {clients.map((c, idx) => (
+                    <div
+                      key={c.name}
+                      className={`cm-client-row${clientDragOverIdx === idx && clientDragIdx !== idx ? ' cm-drag-over' : ''}${clientDragIdx === idx ? ' cm-dragging' : ''}`}
+                      draggable
+                      onDragStart={() => handleClientDragStart(idx)}
+                      onDragOver={(e) => handleClientDragOver(e, idx)}
+                      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleClientDrop(clientDragOverIdx ?? idx); }}
+                      onDragEnd={handleClientDragEnd}
+                    >
+                      <span className="cm-drag-handle">⠿</span>
                       <div className="cm-client-info">
                         <span className="cm-client-name">{c.display_name || c.name}</span>
                         <span className="cm-client-sub">{c.host}:{c.port}/{c.service_name}</span>
@@ -288,6 +332,14 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
                       <span className="cm-client-more" onClick={e => handleMoreClick(e, c.name)}>···</span>
                     </div>
                   ))}
+                  {/* End sentinel: drop zone after last client */}
+                  {clientDragIdx !== null && (
+                    <div
+                      className={`cm-client-drop-end${clientDragOverIdx === clients.length ? ' active' : ''}`}
+                      onDragOver={e => { e.preventDefault(); setClientDragOverIdx(clients.length); }}
+                      onDrop={e => { e.preventDefault(); handleClientDrop(clients.length); }}
+                    />
+                  )}
                   {clients.length === 0 && (
                     <div className="cm-empty">No clients configured</div>
                   )}
