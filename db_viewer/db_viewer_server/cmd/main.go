@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	cfgPath := "db_viewer/sql_test/config.yml"
+	cfgPath := "db_viewer/db_viewer_server/config.yml"
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
 	}
@@ -29,14 +29,11 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Use the first client from config.yml as the "admin" connection for reading CLIENT_CONFIG rows.
-	// All client configs are stored in DB_VIEWER_APP_DATA on this admin DB.
-	if len(cfg.Clients) == 0 {
-		log.Fatal("At least one client must be defined in config.yml for the admin connection")
-	}
-	adminClient := cfg.Clients[0]
+	// Use data_store from config.yml as the server-side connection for storing app data (DB_VIEWER_APP_DATA).
+	// This connection is not exposed to the web UI.
+	ds := cfg.DataStore
 	adminConnStr := fmt.Sprintf("oracle://%s:%s@%s:%d/%s",
-		adminClient.User, adminClient.Password, adminClient.Host, adminClient.Port, adminClient.Service)
+		ds.User, ds.Password, ds.Host, ds.Port, ds.Service)
 	adminDB, err := sql.Open("oracle", adminConnStr)
 	if err != nil {
 		log.Fatalf("Failed to open admin connection: %v", err)

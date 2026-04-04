@@ -38,7 +38,7 @@ func NewTableService(
 
 func (s *TableService) ListClients() []model.ClientInfo {
 	configs := s.clientSvc.GetClientConfigs(context.Background())
-	var result []model.ClientInfo
+	result := make([]model.ClientInfo, 0)
 	for _, c := range configs {
 		result = append(result, model.ClientInfo{Name: c.Name, DisplayName: c.Name, Schema: c.Schema})
 	}

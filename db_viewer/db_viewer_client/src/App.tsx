@@ -104,7 +104,7 @@ const App: React.FC = () => {
 
   // Load clients on mount
   const refreshClients = useCallback(() => {
-    api.getClients().then(setClients).catch(() => {});
+    api.getClients().then((data) => setClients(data ?? [])).catch(() => {});
   }, []);
   useEffect(() => {
     refreshClients();

@@ -66,6 +66,12 @@ type ReleaseLockRequest struct {
 	SessionID string `json:"session_id"`
 }
 
+type PresetQueryArgConfig struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
 type SavePresetFilterRequest struct {
 	Name    string   `json:"name"`
 	Details string   `json:"details"`

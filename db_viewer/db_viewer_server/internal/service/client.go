@@ -41,7 +41,7 @@ func NewClientService(pool *ConnectionPool, adminRepo *repository.AppDataReposit
 }
 
 func (s *ClientService) ListClients(ctx context.Context) ([]model.ClientConfigResponse, error) {
-	rows, err := s.adminRepo.List(ctx, featureClientConfig, "", "")
+	rows, err := s.adminRepo.ListByFeature(ctx, featureClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *ClientService) ListClients(ctx context.Context) ([]model.ClientConfigRe
 }
 
 func (s *ClientService) GetClient(ctx context.Context, name string) (model.ClientConfigResponse, error) {
-	row, err := s.adminRepo.Get(ctx, featureClientConfig, "", "", name)
+	row, err := s.adminRepo.GetByFeatureAndKey(ctx, featureClientConfig, name)
 	if err != nil {
 		return model.ClientConfigResponse{}, fmt.Errorf("client not found: %s", name)
 	}
@@ -93,7 +93,7 @@ func (s *ClientService) SaveClient(ctx context.Context, req model.SaveClientRequ
 
 	// Check duplicate on create
 	if isCreate {
-		_, err := s.adminRepo.Get(ctx, featureClientConfig, "", "", req.Name)
+		_, err := s.adminRepo.GetByFeatureAndKey(ctx, featureClientConfig, req.Name)
 		if err == nil {
 			return fmt.Errorf("CONFLICT:client '%s' already exists", req.Name)
 		}
@@ -102,7 +102,7 @@ func (s *ClientService) SaveClient(ctx context.Context, req model.SaveClientRequ
 	// Build JSON — for update, if password is empty, keep existing password
 	password := req.Password
 	if !isCreate && password == "" {
-		existing, err := s.adminRepo.Get(ctx, featureClientConfig, "", "", req.Name)
+		existing, err := s.adminRepo.GetByFeatureAndKey(ctx, featureClientConfig, req.Name)
 		if err == nil {
 			var old clientConfigJSON
 			if json.Unmarshal([]byte(existing.Data), &old) == nil {
@@ -126,7 +126,7 @@ func (s *ClientService) SaveClient(ctx context.Context, req model.SaveClientRequ
 		return err
 	}
 
-	if err := s.adminRepo.Upsert(ctx, featureClientConfig, "", "", req.Name, string(data)); err != nil {
+	if err := s.adminRepo.UpsertByFeatureAndKey(ctx, featureClientConfig, req.Name, string(data)); err != nil {
 		return err
 	}
 
@@ -146,7 +146,7 @@ func (s *ClientService) DeleteClient(ctx context.Context, name string) error {
 	}
 
 	// Delete the CLIENT_CONFIG row itself
-	if err := s.adminRepo.Delete(ctx, featureClientConfig, "", "", name); err != nil {
+	if err := s.adminRepo.DeleteByFeatureAndKey(ctx, featureClientConfig, name); err != nil {
 		return fmt.Errorf("delete client config: %w", err)
 	}
 
@@ -218,7 +218,7 @@ func (s *ClientService) ListAllTablesFromConnection(ctx context.Context, req mod
 
 // LoadClientsFromDB reads all CLIENT_CONFIG rows and opens connections in the pool.
 func (s *ClientService) LoadClientsFromDB(ctx context.Context) error {
-	rows, err := s.adminRepo.List(ctx, featureClientConfig, "", "")
+	rows, err := s.adminRepo.ListByFeature(ctx, featureClientConfig)
 	if err != nil {
 		return err
 	}
@@ -238,7 +238,7 @@ func (s *ClientService) LoadClientsFromDB(ctx context.Context) error {
 
 // GetClientConfigs returns a map of client name → model.ClientConfig for use by TableService/PresetService.
 func (s *ClientService) GetClientConfigs(ctx context.Context) map[string]model.ClientConfig {
-	rows, err := s.adminRepo.List(ctx, featureClientConfig, "", "")
+	rows, err := s.adminRepo.ListByFeature(ctx, featureClientConfig)
 	if err != nil {
 		return nil
 	}
