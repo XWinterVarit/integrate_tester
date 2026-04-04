@@ -45,14 +45,19 @@ const FilterEditorPopup: React.FC<FilterEditorPopupProps> = ({ initial, allColum
     setShowTrash(true);
   }, []);
 
+  // Top/bottom half detection: dragOverIdx = idx (insert before) or idx+1 (insert after)
   const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
     e.preventDefault();
-    setDragOverIdx(idx);
-  }, []);
+    if (dragIdx === null) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setDragOverIdx(e.clientY > rect.top + rect.height / 2 ? idx + 1 : idx);
+  }, [dragIdx]);
 
-  const handleDrop = useCallback((e: React.DragEvent, dropIdx: number) => {
+  // insertBefore = gap index (0..N)
+  const handleDrop = useCallback((e: React.DragEvent, insertBefore: number) => {
     e.preventDefault();
-    if (dragIdx === null || dragIdx === dropIdx) {
+    e.stopPropagation();
+    if (dragIdx === null) {
       setDragIdx(null);
       setDragOverIdx(null);
       setShowTrash(false);
@@ -61,7 +66,8 @@ const FilterEditorPopup: React.FC<FilterEditorPopupProps> = ({ initial, allColum
     setActiveItems((prev) => {
       const items = [...prev];
       const [moved] = items.splice(dragIdx, 1);
-      items.splice(dropIdx, 0, moved);
+      const adjustedIdx = dragIdx < insertBefore ? insertBefore - 1 : insertBefore;
+      items.splice(adjustedIdx, 0, moved);
       return items;
     });
     setDragIdx(null);
@@ -130,11 +136,11 @@ const FilterEditorPopup: React.FC<FilterEditorPopupProps> = ({ initial, allColum
               {activeItems.map((item, idx) => (
                 <div
                   key={`${item}-${idx}`}
-                  className={`filter-editor-item active-item${dragOverIdx === idx ? ' drag-over' : ''}${dragIdx === idx ? ' dragging' : ''}`}
+                  className={`filter-editor-item active-item${dragOverIdx === idx && dragIdx !== idx ? ' drag-over' : ''}${dragIdx === idx ? ' dragging' : ''}`}
                   draggable
                   onDragStart={() => handleDragStart(idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
-                  onDrop={(e) => handleDrop(e, idx)}
+                  onDrop={(e) => handleDrop(e, dragOverIdx ?? idx)}
                   onDragEnd={handleDragEnd}
                 >
                   <span className="drag-handle">⠿</span>
@@ -142,6 +148,14 @@ const FilterEditorPopup: React.FC<FilterEditorPopupProps> = ({ initial, allColum
                   <span className="remove-btn" onClick={(e) => { e.stopPropagation(); removeFromActive(idx); }}>✕</span>
                 </div>
               ))}
+              {/* End sentinel: drop zone after the last item */}
+              {dragIdx !== null && (
+                <div
+                  className={`filter-editor-drop-end${dragOverIdx === activeItems.length ? ' active' : ''}`}
+                  onDragOver={e => { e.preventDefault(); setDragOverIdx(activeItems.length); }}
+                  onDrop={e => handleDrop(e, activeItems.length)}
+                />
+              )}
             </div>
             {showTrash && (
               <div

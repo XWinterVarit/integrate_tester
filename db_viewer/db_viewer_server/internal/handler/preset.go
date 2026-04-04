@@ -114,12 +114,14 @@ func (h *PresetHandler) ResolveQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PresetHandler) ValidateQuery(w http.ResponseWriter, r *http.Request) {
+	client := r.PathValue("client")
+	table := r.PathValue("table")
 	var req model.ValidateQueryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	result := h.svc.ValidateQuery(r.Context(), req)
+	result := h.svc.ValidateQuery(r.Context(), client, table, req)
 	writeJSON(w, result)
 }
 

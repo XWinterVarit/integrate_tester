@@ -5,14 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sort"
 
 	_ "github.com/sijms/go-ora/v2"
 
+	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/logger"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/model"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/repository"
 )
+
+var svcLog = logger.New("CLIENT_SVC")
 
 const featureClientConfig = "CLIENT_CONFIG"
 
@@ -49,7 +51,7 @@ func (s *ClientService) ListClients(ctx context.Context) ([]model.ClientConfigRe
 	for _, row := range rows {
 		var cfg clientConfigJSON
 		if err := json.Unmarshal([]byte(row.Data), &cfg); err != nil {
-			log.Printf("Warning: invalid CLIENT_CONFIG JSON for key=%s: %v", row.ItemKey, err)
+			svcLog.Warn("Invalid CLIENT_CONFIG JSON for key=%s, skipping: %v", row.ItemKey, err)
 			continue
 		}
 		result = append(result, model.ClientConfigResponse{
@@ -142,7 +144,7 @@ func (s *ClientService) SaveClient(ctx context.Context, req model.SaveClientRequ
 func (s *ClientService) DeleteClient(ctx context.Context, name string) error {
 	// Delete all related data (presets, field descs, locks) for this client
 	if err := s.adminRepo.DeleteByScope(ctx, name); err != nil {
-		log.Printf("Warning: failed to delete scoped data for client %s: %v", name, err)
+		svcLog.Warn("Failed to delete scoped app data for client %q: %v", name, err)
 	}
 
 	// Delete the CLIENT_CONFIG row itself
@@ -225,12 +227,16 @@ func (s *ClientService) LoadClientsFromDB(ctx context.Context) error {
 	for _, row := range rows {
 		var cfg clientConfigJSON
 		if err := json.Unmarshal([]byte(row.Data), &cfg); err != nil {
-			log.Printf("Warning: skipping invalid CLIENT_CONFIG key=%s: %v", row.ItemKey, err)
+			svcLog.Warn("Skipping invalid CLIENT_CONFIG JSON for key=%s: %v", row.ItemKey, err)
 			continue
 		}
 		schema := cfg.Username
 		if err := s.pool.Add(cfg.Name, cfg.Host, cfg.Port, cfg.ServiceName, cfg.Username, cfg.Password, schema); err != nil {
-			log.Printf("Warning: failed to connect client %s: %v", cfg.Name, err)
+			svcLog.Warn("Failed to open connection for client %q (host: %s:%d, service: %s, user: %s): %v",
+				cfg.Name, cfg.Host, cfg.Port, cfg.ServiceName, cfg.Username, err)
+		} else {
+			svcLog.Info("Client %q connected (host: %s:%d, service: %s, user: %s)",
+				cfg.Name, cfg.Host, cfg.Port, cfg.ServiceName, cfg.Username)
 		}
 	}
 	return nil

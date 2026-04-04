@@ -8,7 +8,7 @@
 .sidebar-header-more {
   font-size: 13px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.15s;
   padding: 2px 6px;
   border-radius: 4px;
@@ -119,6 +119,11 @@
   flex-direction: column;
   gap: 2px;
   margin-bottom: 16px;
+  border: 1px solid #d2d2d7;
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 4px;
+  background: #fafafa;
 }
 .cm-client-row {
   display: flex;
@@ -148,7 +153,7 @@
 .cm-client-more {
   font-size: 14px;
   cursor: pointer;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.15s;
   padding: 4px 8px;
   border-radius: 6px;
@@ -304,79 +309,36 @@
   display: flex;
   gap: 16px;
   margin-bottom: 12px;
+  min-height: 280px;
 }
-.cm-col {
+.cm-two-col .filter-editor-panel {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #d2d2d7;
-  border-radius: 10px;
-  overflow: hidden;
-  min-height: 260px;
+  border: 1px solid #c0c0c8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.04),
+    inset 0 1px 4px rgba(0,0,0,0.07);
 }
-.cm-col-header {
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #86868b;
-  background: #f5f5f7;
-  border-bottom: 1px solid #d2d2d7;
+.cm-two-col .filter-editor-panel-title {
+  border-bottom: 1px solid #c8c8cc;
+  background: #f2f2f5;
+  padding: 7px 12px;
+  border-radius: 8px 8px 0 0;
 }
-.cm-col-list {
-  flex: 1;
-  overflow-y: auto;
+.cm-two-col .filter-editor-list {
   max-height: 240px;
-  padding: 4px;
+  min-height: 140px;
 }
-.cm-col-item {
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  cursor: grab;
-  transition: background 0.1s;
-  color: #1d1d1f;
-}
-.cm-col-item:hover {
-  background: #f5f5f7;
-}
-.cm-col-item.cm-col-item-visible {
-  background: rgba(0, 122, 255, 0.06);
-  margin-bottom: 2px;
-}
-.cm-col-item.cm-special {
-  color: #86868b;
-  font-style: italic;
-  text-align: center;
-  font-size: 11px;
-}
-.cm-col-actions {
-  display: flex;
-  gap: 6px;
-  padding: 8px;
-  border-top: 1px solid #d2d2d7;
+/* Left panel items: pointer cursor (clickable, not draggable) */
+.cm-two-col .filter-editor-panel:first-child .filter-editor-item {
+  cursor: pointer;
 }
 .cm-empty-col {
   text-align: center;
   padding: 30px 10px;
   color: #86868b;
   font-size: 12px;
-}
-.cm-trash-zone {
-  text-align: center;
-  padding: 12px;
-  border: 2px dashed #d2d2d7;
-  border-radius: 10px;
-  color: #86868b;
-  font-size: 12px;
-  margin-bottom: 12px;
-  transition: all 0.15s;
-}
-.cm-trash-zone.cm-trash-active {
-  border-color: #FF3B30;
-  background: rgba(255, 59, 48, 0.06);
-  color: #FF3B30;
 }
 
 /* Confirm dialog */

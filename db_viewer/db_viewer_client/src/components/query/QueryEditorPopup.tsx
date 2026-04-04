@@ -13,7 +13,7 @@ interface QueryEditorPopupProps {
   initial: PresetQuery | null;
   client: string;
   table: string;
-  onSave: (data: { name: string; query: string; arguments: PresetQueryArg[] }) => void;
+  onSave: (data: { name: string; query: string; arguments: PresetQueryArg[] }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -24,6 +24,8 @@ const QueryEditorPopup: React.FC<QueryEditorPopupProps> = ({ initial, client, ta
   const [syntaxValid, setSyntaxValid] = useState<boolean | null>(null);
   const [syntaxError, setSyntaxError] = useState('');
   const [undefinedArgs, setUndefinedArgs] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [argPopup, setArgPopup] = useState<{ index: number; arg: PresetQueryArg } | null>(null);
   const lastSyncRef = useRef(query);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,9 +99,21 @@ const QueryEditorPopup: React.FC<QueryEditorPopupProps> = ({ initial, client, ta
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim() || !query.trim()) return;
-    onSave({ name: name.trim(), query: query.trim(), arguments: args });
+    if (syntaxValid === false) {
+      setSaveError('Cannot save: query has syntax errors. Please fix the query first.');
+      return;
+    }
+    setSaveError('');
+    setSaving(true);
+    try {
+      await onSave({ name: name.trim(), query: query.trim(), arguments: args });
+    } catch (err: any) {
+      setSaveError(err?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteArg = (idx: number) => {
@@ -184,8 +198,13 @@ const QueryEditorPopup: React.FC<QueryEditorPopupProps> = ({ initial, client, ta
         </div>
 
         <div className="modal-editor-footer">
+          {saveError && (
+            <span style={{ color: 'var(--danger)', fontSize: 12, marginRight: 'auto' }}>❌ {saveError}</span>
+          )}
           <button className="secondary" onClick={onClose}>Cancel</button>
-          <button onClick={handleSave} disabled={!name.trim() || !query.trim()}>Save</button>
+          <button onClick={handleSave} disabled={!name.trim() || !query.trim() || saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </div>
 

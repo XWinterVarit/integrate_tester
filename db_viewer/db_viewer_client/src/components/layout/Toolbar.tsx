@@ -17,13 +17,14 @@ interface ToolbarProps {
   onShowTableInfo: () => void;
 }
 
+const LIMIT_OPTIONS = [10, 20, 50, 100, 500];
+
 const Toolbar: React.FC<ToolbarProps> = ({
   columns, where, sortCol, sortDir, limit, viewMode,
   onWhereChange, onSortColChange, onSortDirChange,
   onLimitChange, onViewModeChange, onRefresh, onShowTableInfo,
 }) => {
   const [localWhere, setLocalWhere] = useState(where);
-  const [localLimit, setLocalLimit] = useState(String(limit));
 
   const handleWhereKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -31,16 +32,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
-  const handleLimitKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const v = Number(localLimit);
-      onLimitChange(v > 0 ? v : 100);
-    }
-  };
-
   // Sync local state when parent resets values (e.g. table change)
   React.useEffect(() => { setLocalWhere(where); }, [where]);
-  React.useEffect(() => { setLocalLimit(String(limit)); }, [limit]);
 
   return (
     <div className="toolbar">
@@ -71,14 +64,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <div className="toolbar-group">
         <label>Limit</label>
-        <input
-          type="number"
-          value={localLimit}
-          onChange={(e) => setLocalLimit(e.target.value)}
-          onKeyDown={handleLimitKey}
-          style={{ width: 70 }}
-          min={1}
-        />
+        <select value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} style={{ width: 70 }}>
+          {LIMIT_OPTIONS.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
       </div>
 
       <div className="view-toggle">

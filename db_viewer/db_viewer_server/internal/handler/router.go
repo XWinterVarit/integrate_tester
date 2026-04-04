@@ -2,14 +2,16 @@ package handler
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/logger"
 	"github.com/XWinterVarit/integrate_tester/db_viewer/db_viewer_server/internal/service"
 )
 
 const defaultQueryTimeout = 10 * time.Second
+
+var reqLog = logger.New("HTTP")
 
 type statusRecorder struct {
 	http.ResponseWriter
@@ -26,7 +28,21 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		sr := &statusRecorder{ResponseWriter: w, code: http.StatusOK}
 		next.ServeHTTP(sr, r)
-		log.Printf("[REQUEST] %s %s %d %s", r.Method, r.URL.Path, sr.code, time.Since(start))
+
+		query := ""
+		if q := r.URL.RawQuery; q != "" {
+			query = "?" + q
+		}
+		elapsed := time.Since(start)
+
+		switch {
+		case sr.code >= 500:
+			reqLog.Error("%s %s%s → %d (%s) [%s]", r.Method, r.URL.Path, query, sr.code, http.StatusText(sr.code), elapsed)
+		case sr.code >= 400:
+			reqLog.Warn("%s %s%s → %d (%s) [%s]", r.Method, r.URL.Path, query, sr.code, http.StatusText(sr.code), elapsed)
+		default:
+			reqLog.Info("%s %s%s → %d (%s) [%s] from %s", r.Method, r.URL.Path, query, sr.code, http.StatusText(sr.code), elapsed, r.RemoteAddr)
+		}
 	})
 }
 

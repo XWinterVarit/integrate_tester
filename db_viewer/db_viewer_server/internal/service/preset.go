@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -146,6 +147,13 @@ func (s *PresetService) SavePresetQuery(ctx context.Context, client, table strin
 	if req.Query == "" {
 		return fmt.Errorf("query is required")
 	}
+	// Validate query syntax and argument references before persisting
+	if validation := s.ValidateQuery(ctx, client, table, model.ValidateQueryRequest{
+		Query:     req.Query,
+		Arguments: req.Arguments,
+	}); !validation.Valid {
+		return fmt.Errorf("invalid query: %s", validation.Error)
+	}
 	resp := model.PresetQueryResponse{
 		Name:  req.Name,
 		Query: req.Query,
@@ -176,16 +184,20 @@ func (s *PresetService) DeletePresetQuery(ctx context.Context, client, table, na
 
 var argPattern = regexp.MustCompile(`:([A-Za-z_][A-Za-z0-9_]*)`)
 
-func (s *PresetService) ValidateQuery(_ context.Context, req model.ValidateQueryRequest) model.ValidateQueryResponse {
+// ValidateQuery checks argument references AND validates SQL syntax against the live DB.
+func (s *PresetService) ValidateQuery(ctx context.Context, client, table string, req model.ValidateQueryRequest) model.ValidateQueryResponse {
 	if strings.TrimSpace(req.Query) == "" {
 		return model.ValidateQueryResponse{Valid: false, Error: "query is empty"}
 	}
 
-	// Extract all :ARGUMENT references from the query
+	// Step 1: check for undefined :ARGUMENT references
 	matches := argPattern.FindAllStringSubmatch(req.Query, -1)
 	definedArgs := make(map[string]bool)
+	argTypeMap := make(map[string]string)
 	for _, a := range req.Arguments {
-		definedArgs[strings.ToUpper(a.Name)] = true
+		upper := strings.ToUpper(a.Name)
+		definedArgs[upper] = true
+		argTypeMap[upper] = a.Type
 	}
 
 	var undefined []string
@@ -197,7 +209,6 @@ func (s *PresetService) ValidateQuery(_ context.Context, req model.ValidateQuery
 			seen[name] = true
 		}
 	}
-
 	if len(undefined) > 0 {
 		return model.ValidateQueryResponse{
 			Valid:         false,
@@ -205,6 +216,42 @@ func (s *PresetService) ValidateQuery(_ context.Context, req model.ValidateQuery
 			UndefinedArgs: undefined,
 		}
 	}
+
+	// Step 2: validate SQL syntax by doing a zero-row dry-run against the real DB.
+	// Wrapping in SELECT * FROM (...) WHERE 1=0 forces Oracle to fully parse the
+	// inner query without returning any rows or mutating data.
+	db, ok := s.pool.GetDB(client)
+	if !ok {
+		return model.ValidateQueryResponse{Valid: false, Error: "client not found"}
+	}
+
+	schema := s.getSchema(client)
+	sqlToCheck := strings.ReplaceAll(req.Query, "{THIS_TABLE}", schema+"."+table)
+	dryRun := "SELECT * FROM (" + sqlToCheck + ") WHERE 1=0"
+
+	// Build dummy bind args for every :ARGNAME so Oracle accepts the statement.
+	var sqlArgs []any
+	seenBind := make(map[string]bool)
+	for _, m := range argPattern.FindAllStringSubmatch(sqlToCheck, -1) {
+		name := m[1]
+		upper := strings.ToUpper(name)
+		if seenBind[upper] {
+			continue
+		}
+		seenBind[upper] = true
+		switch argTypeMap[upper] {
+		case "number":
+			sqlArgs = append(sqlArgs, sql.Named(name, 0))
+		default:
+			sqlArgs = append(sqlArgs, sql.Named(name, ""))
+		}
+	}
+
+	rows, err := db.QueryContext(ctx, dryRun, sqlArgs...)
+	if err != nil {
+		return model.ValidateQueryResponse{Valid: false, Error: err.Error()}
+	}
+	rows.Close()
 
 	return model.ValidateQueryResponse{Valid: true}
 }

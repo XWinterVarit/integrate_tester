@@ -40,8 +40,9 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const [dragItem, setDragItem] = useState<string | null>(null);
-  const [dragOverTrash, setDragOverTrash] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
 
   const loadClients = useCallback(async () => {
     try {
@@ -198,53 +199,69 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
     setMoreMenu(prev => prev === name ? null : name);
   };
 
-  // Drag from available to visible
-  const handleDragStartAvailable = (e: React.DragEvent, table: string) => {
-    e.dataTransfer.setData('text/plain', table);
-    e.dataTransfer.effectAllowed = 'copy';
-    setDragItem(table);
+  // Left panel: click to add to visible
+  const addTableToVisible = (t: string) => {
+    setForm(f => ({ ...f, tables: [...f.tables, t] }));
   };
 
-  const handleDropOnVisible = (e: React.DragEvent) => {
+  const removeFromVisible = (idx: number) => {
+    setForm(f => ({ ...f, tables: f.tables.filter((_, i) => i !== idx) }));
+  };
+
+  // Right panel: state-based drag reorder (no dataTransfer parsing)
+  const handleDragStartVisible = (idx: number) => {
+    setDragIdx(idx);
+    setShowTrash(true);
+  };
+
+  // Use top/bottom half detection so dragOverIdx = idx means "insert before idx"
+  // and dragOverIdx = idx+1 means "insert after idx" (= before the next item)
+  const handleDragOverVisible = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
-    const table = e.dataTransfer.getData('text/plain');
-    if (table && !form.tables.includes(table)) {
-      setForm(f => ({ ...f, tables: [...f.tables, table] }));
+    if (dragIdx === null) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setDragOverIdx(e.clientY > rect.top + rect.height / 2 ? idx + 1 : idx);
+  };
+
+  // insertBefore = the gap index (0..N) to insert at
+  const handleDropAt = (insertBefore: number) => {
+    if (dragIdx === null) return;
+    setForm(f => {
+      const items = [...f.tables];
+      const [moved] = items.splice(dragIdx, 1);
+      // After removal, positions after dragIdx shift left by 1
+      const adjustedIdx = dragIdx < insertBefore ? insertBefore - 1 : insertBefore;
+      items.splice(adjustedIdx, 0, moved);
+      return { ...f, tables: items };
+    });
+    setDragIdx(null);
+    setDragOverIdx(null);
+    setShowTrash(false);
+  };
+
+  const handleDragEndVisible = () => {
+    setDragIdx(null);
+    setDragOverIdx(null);
+    setShowTrash(false);
+  };
+
+  const handleTrashDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIdx !== null) {
+      removeFromVisible(dragIdx);
     }
-    setDragItem(null);
+    setDragIdx(null);
+    setShowTrash(false);
   };
 
-  // Drag within visible to reorder
-  const handleDragStartVisible = (e: React.DragEvent, idx: number) => {
-    e.dataTransfer.setData('text/plain', String(idx));
-    e.dataTransfer.effectAllowed = 'move';
-    setDragItem(form.tables[idx]);
-  };
-
-  const handleDropOnVisibleItem = (e: React.DragEvent, targetIdx: number) => {
-    e.preventDefault();
-    const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (isNaN(sourceIdx)) return;
-    const newTables = [...form.tables];
-    const [moved] = newTables.splice(sourceIdx, 1);
-    newTables.splice(targetIdx, 0, moved);
-    setForm(f => ({ ...f, tables: newTables }));
-    setDragItem(null);
-  };
-
-  // Drag out to trash
-  const handleDropOnTrash = (e: React.DragEvent) => {
-    e.preventDefault();
-    const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (!isNaN(sourceIdx)) {
-      setForm(f => ({ ...f, tables: f.tables.filter((_, i) => i !== sourceIdx) }));
+  const addSpecial = (tag: string) => {
+    if (tag === '<COMMENTARY>') {
+      const label = prompt('Commentary text:');
+      if (!label) return;
+      setForm(f => ({ ...f, tables: [...f.tables, `<COMMENTARY> ${label}`] }));
+    } else {
+      setForm(f => ({ ...f, tables: [...f.tables, tag] }));
     }
-    setDragItem(null);
-    setDragOverTrash(false);
-  };
-
-  const addSpecialToken = (token: string) => {
-    setForm(f => ({ ...f, tables: [...f.tables, token] }));
   };
 
   const slideClass = direction === 'forward' ? 'cm-slide-forward' : 'cm-slide-back';
@@ -337,51 +354,64 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
               </div>
               <div className="cm-panel-body">
                 <div className="cm-two-col">
-                  <div className="cm-col">
-                    <div className="cm-col-header">Available</div>
-                    <div className="cm-col-list">
+                  {/* Left: Available (click to add) */}
+                  <div className="filter-editor-panel">
+                    <div className="filter-editor-panel-title">Available</div>
+                    <div className="filter-editor-list">
                       {allTables.filter(t => !form.tables.includes(t)).map(t => (
-                        <div key={t} className="cm-col-item" draggable onDragStart={e => handleDragStartAvailable(e, t)}>
+                        <div key={t} className="filter-editor-item" onClick={() => addTableToVisible(t)}>
                           {t}
                         </div>
                       ))}
                     </div>
-                    <div className="cm-col-actions">
-                      <button className="cm-btn cm-btn-small" onClick={() => addSpecialToken('<SPACE>')}>+ Space</button>
-                      <button className="cm-btn cm-btn-small" onClick={() => addSpecialToken('<COMMENTARY>')}>+ Commentary</button>
+                    <div className="filter-editor-specials">
+                      <button className="secondary small" onClick={() => addSpecial('<SPACE>')}>+ &lt;SPACE&gt;</button>
+                      <button className="secondary small" onClick={() => addSpecial('<COMMENTARY>')}>+ &lt;COMMENTARY&gt;</button>
                     </div>
                   </div>
-                  <div className="cm-col" onDragOver={e => e.preventDefault()} onDrop={handleDropOnVisible}>
-                    <div className="cm-col-header">Visible in App</div>
-                    <div className="cm-col-list">
+
+                  {/* Right: Visible in App (drag to reorder) */}
+                  <div className="filter-editor-panel">
+                    <div className="filter-editor-panel-title">Visible in App</div>
+                    <div className="filter-editor-list">
                       {form.tables.map((t, idx) => (
                         <div
                           key={`${t}-${idx}`}
-                          className={`cm-col-item cm-col-item-visible ${t === '<SPACE>' ? 'cm-special' : ''} ${t.startsWith('<COMMENTARY>') ? 'cm-special' : ''}`}
+                          className={`filter-editor-item active-item${dragOverIdx === idx && dragIdx !== idx ? ' drag-over' : ''}${dragIdx === idx ? ' dragging' : ''}`}
                           draggable
-                          onDragStart={e => handleDragStartVisible(e, idx)}
-                          onDragOver={e => e.preventDefault()}
-                          onDrop={e => handleDropOnVisibleItem(e, idx)}
+                          onDragStart={() => handleDragStartVisible(idx)}
+                          onDragOver={(e) => handleDragOverVisible(e, idx)}
+                          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropAt(dragOverIdx ?? idx); }}
+                          onDragEnd={handleDragEndVisible}
                         >
-                          {t === '<SPACE>' ? '── Space ──' : t.startsWith('<COMMENTARY>') ? `── ${t.replace('<COMMENTARY>', '').trim() || 'Commentary'} ──` : t}
+                          <span className="drag-handle">⠿</span>
+                          <span className="item-label">{t}</span>
+                          <span className="remove-btn" onClick={e => { e.stopPropagation(); removeFromVisible(idx); }}>✕</span>
                         </div>
                       ))}
+                      {/* End sentinel: drop zone after the last item */}
+                      {dragIdx !== null && (
+                        <div
+                          className={`filter-editor-drop-end${dragOverIdx === form.tables.length ? ' active' : ''}`}
+                          onDragOver={e => { e.preventDefault(); setDragOverIdx(form.tables.length); }}
+                          onDrop={e => { e.preventDefault(); handleDropAt(form.tables.length); }}
+                        />
+                      )}
                       {form.tables.length === 0 && (
-                        <div className="cm-empty-col">Drag tables here</div>
+                        <div className="cm-empty-col">Click tables on the left to add</div>
                       )}
                     </div>
+                    {showTrash && (
+                      <div
+                        className="filter-editor-trash"
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={handleTrashDrop}
+                      >
+                        🗑 Drop here to remove
+                      </div>
+                    )}
                   </div>
                 </div>
-                {dragItem && (
-                  <div
-                    className={`cm-trash-zone ${dragOverTrash ? 'cm-trash-active' : ''}`}
-                    onDragOver={e => { e.preventDefault(); setDragOverTrash(true); }}
-                    onDragLeave={() => setDragOverTrash(false)}
-                    onDrop={handleDropOnTrash}
-                  >
-                    🗑 Drop here to remove
-                  </div>
-                )}
                 <div className="cm-panel-footer">
                   <button className="cm-btn cm-btn-ghost" onClick={() => goTo('list', 'back')}>Cancel</button>
                   <button className="cm-btn cm-btn-primary" disabled={saving} onClick={handleSave}>

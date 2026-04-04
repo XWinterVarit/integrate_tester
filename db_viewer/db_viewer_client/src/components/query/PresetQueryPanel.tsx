@@ -100,12 +100,10 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({
   };
 
   const handleEditorSave = async (data: { name: string; query: string; arguments: { name: string; type: string; description: string }[] }) => {
-    try {
-      await api.savePresetQuery(client, table, data);
-      setEditorOpen(false);
-      setEditingQuery(null);
-      onRefresh();
-    } catch {}
+    await api.savePresetQuery(client, table, data); // throws on error → QueryEditorPopup catches and shows it
+    setEditorOpen(false);
+    setEditingQuery(null);
+    onRefresh();
   };
 
   return (

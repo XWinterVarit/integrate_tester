@@ -104,6 +104,16 @@
 .filter-editor-item.active-item.drag-over {
   border-top: 2px solid var(--accent);
 }
+/* End-of-list drop sentinel */
+.filter-editor-drop-end {
+  min-height: 10px;
+  flex-shrink: 0;
+  border-top: 2px solid transparent;
+  transition: border-color 0.1s;
+}
+.filter-editor-drop-end.active {
+  border-top: 2px solid var(--accent);
+}
 .filter-editor-item .drag-handle {
   color: var(--text-secondary);
   font-size: 12px;
