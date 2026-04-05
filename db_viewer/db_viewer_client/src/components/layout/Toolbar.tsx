@@ -8,6 +8,7 @@ interface ToolbarProps {
   sortDir: string;
   limit: number;
   viewMode: ViewMode;
+  whereDisabled?: boolean;
   onWhereChange: (v: string) => void;
   onSortColChange: (v: string) => void;
   onSortDirChange: (v: string) => void;
@@ -20,14 +21,14 @@ interface ToolbarProps {
 const LIMIT_OPTIONS = [10, 20, 50, 100, 500];
 
 const Toolbar: React.FC<ToolbarProps> = ({
-  columns, where, sortCol, sortDir, limit, viewMode,
+  columns, where, sortCol, sortDir, limit, viewMode, whereDisabled,
   onWhereChange, onSortColChange, onSortDirChange,
   onLimitChange, onViewModeChange, onRefresh, onShowTableInfo,
 }) => {
   const [localWhere, setLocalWhere] = useState(where);
 
   const handleWhereKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !whereDisabled) {
       onWhereChange(localWhere);
     }
   };
@@ -38,13 +39,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div className="toolbar">
       <div className="toolbar-group">
-        <label>Where</label>
+        <label style={whereDisabled ? { opacity: 0.45 } : undefined}>Where</label>
         <input
           value={localWhere}
-          onChange={(e) => setLocalWhere(e.target.value)}
+          onChange={(e) => { if (!whereDisabled) setLocalWhere(e.target.value); }}
           onKeyDown={handleWhereKey}
-          placeholder="e.g. NAME = 'aaa' AND AGE > 30"
-          style={{ width: 260 }}
+          disabled={whereDisabled}
+          placeholder={whereDisabled ? 'Disabled while preset query is active' : "e.g. NAME = 'aaa' AND AGE > 30"}
+          style={{ width: 260, ...(whereDisabled ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+          title={whereDisabled ? 'WHERE clause is disabled when a preset query is active' : undefined}
         />
       </div>
 

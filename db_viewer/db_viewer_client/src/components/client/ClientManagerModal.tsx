@@ -46,6 +46,8 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
   // Client list drag reorder
   const [clientDragIdx, setClientDragIdx] = useState<number | null>(null);
   const [clientDragOverIdx, setClientDragOverIdx] = useState<number | null>(null);
+  // Table search (left panel, step 3)
+  const [tableSearch, setTableSearch] = useState('');
 
   const loadClients = useCallback(async () => {
     try {
@@ -168,6 +170,7 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
     } catch {
       setAllTables([]);
     }
+    setTableSearch('');
     goTo('tables', 'forward');
   };
 
@@ -302,7 +305,7 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
   const slideClass = direction === 'forward' ? 'cm-slide-forward' : 'cm-slide-back';
 
   return (
-    <div className="cm-overlay" onClick={onClose}>
+    <div className="cm-overlay">
       <div className="cm-modal" onClick={e => e.stopPropagation()}>
         <div className="cm-container">
           {/* Step 1: Client List */}
@@ -344,9 +347,9 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
                     <div className="cm-empty">No clients configured</div>
                   )}
                 </div>
-                <div className="cm-panel-actions">
-                  <button className="cm-btn cm-btn-primary" onClick={startAdd}>+ Add New Client</button>
-                </div>
+              </div>
+              <div className="cm-panel-actions">
+                <button className="cm-btn cm-btn-primary" onClick={startAdd}>+ Add New Client</button>
               </div>
             </div>
           )}
@@ -381,15 +384,17 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
                   <label className="cm-label">Password
                     <input className="cm-input" type="password" value={form.password} placeholder={isEdit ? '(unchanged)' : ''} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
                   </label>
-                  <div className="cm-test-row">
-                    <button className={`cm-btn cm-btn-test ${testStatus === 'success' ? 'cm-test-ok' : testStatus === 'failed' ? 'cm-test-fail' : ''}`} onClick={handleTestConnection} disabled={testStatus === 'testing'}>
-                      {testStatus === 'testing' ? 'Testing…' : 'Test Connection'}
-                    </button>
-                    {testStatus === 'success' && <span className="cm-test-status cm-test-ok">● Connected</span>}
-                    {testStatus === 'failed' && <span className="cm-test-status cm-test-fail">✗ {testError}</span>}
-                  </div>
                 </div>
-                <div className="cm-panel-footer">
+              </div>
+              <div className="cm-panel-footer cm-panel-footer-connection">
+                <div className="cm-test-row">
+                  <button className={`cm-btn cm-btn-test ${testStatus === 'success' ? 'cm-test-ok' : testStatus === 'failed' ? 'cm-test-fail' : ''}`} onClick={handleTestConnection} disabled={testStatus === 'testing'}>
+                    {testStatus === 'testing' ? 'Testing…' : 'Test Connection'}
+                  </button>
+                  {testStatus === 'success' && <span className="cm-test-status cm-test-ok">● Connected</span>}
+                  {testStatus === 'failed' && <span className="cm-test-status cm-test-fail">✗ {testError}</span>}
+                </div>
+                <div className="cm-footer-actions">
                   <button className="cm-btn cm-btn-ghost" onClick={() => goTo('list', 'back')}>Cancel</button>
                   <button className="cm-btn cm-btn-primary" disabled={!canContinue} onClick={handleContinueToTables}>Continue →</button>
                 </div>
@@ -407,20 +412,31 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
               <div className="cm-panel-body">
                 <div className="cm-two-col">
                   {/* Left: Available (click to add) */}
-                  <div className="filter-editor-panel">
-                    <div className="filter-editor-panel-title">Available</div>
-                    <div className="filter-editor-list">
-                      {allTables.filter(t => !form.tables.includes(t)).map(t => (
-                        <div key={t} className="filter-editor-item" onClick={() => addTableToVisible(t)}>
-                          {t}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="filter-editor-specials">
-                      <button className="secondary small" onClick={() => addSpecial('<SPACE>')}>+ &lt;SPACE&gt;</button>
-                      <button className="secondary small" onClick={() => addSpecial('<COMMENTARY>')}>+ &lt;COMMENTARY&gt;</button>
-                    </div>
-                  </div>
+                   <div className="filter-editor-panel">
+                     <div className="filter-editor-panel-title">Available</div>
+                     <input
+                       className="search-input"
+                       type="text"
+                       placeholder="Search tables…"
+                       value={tableSearch}
+                       onChange={e => setTableSearch(e.target.value)}
+                       style={{ margin: '4px 0 6px', width: '100%', boxSizing: 'border-box' }}
+                     />
+                     <div className="filter-editor-list">
+                       {allTables
+                         .filter(t => !form.tables.includes(t))
+                         .filter(t => t.toLowerCase().includes(tableSearch.toLowerCase()))
+                         .map(t => (
+                           <div key={t} className="filter-editor-item" onClick={() => addTableToVisible(t)}>
+                             {t}
+                           </div>
+                         ))}
+                     </div>
+                     <div className="filter-editor-specials">
+                       <button className="secondary small" onClick={() => addSpecial('<SPACE>')}>+ &lt;SPACE&gt;</button>
+                       <button className="secondary small" onClick={() => addSpecial('<COMMENTARY>')}>+ &lt;COMMENTARY&gt;</button>
+                     </div>
+                   </div>
 
                   {/* Right: Visible in App (drag to reorder) */}
                   <div className="filter-editor-panel">
@@ -464,12 +480,12 @@ const ClientManagerModal: React.FC<Props> = ({ open, onClose, onSaved }) => {
                     )}
                   </div>
                 </div>
-                <div className="cm-panel-footer">
-                  <button className="cm-btn cm-btn-ghost" onClick={() => goTo('list', 'back')}>Cancel</button>
-                  <button className="cm-btn cm-btn-primary" disabled={saving} onClick={handleSave}>
-                    {saving ? 'Saving…' : 'Save →'}
-                  </button>
-                </div>
+              </div>
+              <div className="cm-panel-footer">
+                <button className="cm-btn cm-btn-ghost" onClick={() => goTo('list', 'back')}>Cancel</button>
+                <button className="cm-btn cm-btn-primary" disabled={saving} onClick={handleSave}>
+                  {saving ? 'Saving…' : 'Save →'}
+                </button>
               </div>
             </div>
           )}

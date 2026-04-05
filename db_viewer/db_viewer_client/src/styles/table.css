@@ -535,6 +535,67 @@
   color: #b45309;
 }
 
+/* Interactive yellow banner for active preset query */
+.query-indicator-interactive {
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+  transition: filter 0.15s;
+}
+
+.query-indicator-interactive:hover {
+  filter: brightness(0.93);
+}
+
+/* Hover tooltip — rendered as a portal at document.body with position:fixed */
+.query-indicator-tooltip {
+  min-width: 160px;
+  background: #1c1c2e;
+  color: #f0f0f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.query-indicator-interactive:hover .query-indicator-tooltip {
+  display: block;
+}
+
+.query-indicator-tooltip-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.query-tooltip-key {
+  color: #a0aec0;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.query-tooltip-value {
+  color: #e2e8f0;
+}
+
+/* X button inside the banner */
+.query-indicator-close {
+  margin-left: 8px;
+  padding: 0 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.query-indicator-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.15);
+}
+
 .preset-dropdown-item.active {
   background: var(--bg-secondary, #e8f0fe);
   font-weight: 600;
@@ -585,8 +646,7 @@
 
 .filter-commentary-col {
   width: 20px;
-  min-width: 20px;
-  max-width: 20px;
+  min-width: 18px;
   padding: 0 !important;
   border-bottom: none !important;
   background: transparent !important;
@@ -594,7 +654,15 @@
 }
 
 .commentary-label {
-  writing-mode: vertical-rl;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  padding: 4px 2px;
+  gap: 1px;
+}
+
+.commentary-word {
+  writing-mode: vertical-lr;
   text-orientation: mixed;
   font-size: 9px;
   font-weight: 600;
@@ -602,8 +670,8 @@
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   white-space: nowrap;
-  display: block;
-  padding: 4px 0;
+  line-height: 1.2;
+  display: inline-block;
 }
 
 /* Row action cell (combined # + menu) */

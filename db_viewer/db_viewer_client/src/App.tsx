@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { api } from './api/client';
 import { ViewMode, FloatingWindow as FloatingWindowType, PresetFilter, PresetQuery, Row } from './types';
 import { parseFilterColumns } from './utils/filterColumns';
@@ -80,6 +81,9 @@ const App: React.FC = () => {
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  // Query indicator tooltip (portal-based to escape overflow:hidden)
+  const queryIndicatorRef = useRef<HTMLDivElement>(null);
+  const [queryTooltipPos, setQueryTooltipPos] = useState<{ top: number; left: number } | null>(null);
   let toastCounter = 0;
   const addToast = useCallback((type: 'success' | 'error', text: string, duration?: string) => {
     const id = Date.now() + (toastCounter++);
@@ -390,6 +394,7 @@ const App: React.FC = () => {
               sortDir={sortDir}
               limit={limit}
               viewMode={viewMode}
+              whereDisabled={!!activePresetQuery}
               onWhereChange={setWhere}
               onSortColChange={setSortCol}
               onSortDirChange={setSortDir}
@@ -449,9 +454,35 @@ const App: React.FC = () => {
                   </span>
                 )}
                 {activePresetQuery && (
-                  <span className="active-indicator query-indicator">
+                  <div
+                    ref={queryIndicatorRef}
+                    className="active-indicator query-indicator query-indicator-interactive"
+                    onClick={() => addFloating(
+                      `Preset: ${activePresetQuery.name}`,
+                      'preset-query',
+                      { preset: activePresetQuery, initialArgs: activePresetArgs }
+                    )}
+                    onMouseEnter={() => {
+                      if (queryIndicatorRef.current && activePresetQuery.arguments.length > 0) {
+                        const rect = queryIndicatorRef.current.getBoundingClientRect();
+                        setQueryTooltipPos({ top: rect.bottom + 6, left: rect.left });
+                      }
+                    }}
+                    onMouseLeave={() => setQueryTooltipPos(null)}
+                    title="Click to edit query parameters"
+                  >
                     📋 Query: <strong>{activePresetQuery.name}</strong>
-                  </span>
+                    <span
+                      className="query-indicator-close"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQueryTooltipPos(null);
+                        setActivePresetQuery(null);
+                        setActivePresetArgs({});
+                      }}
+                      title="Clear preset query"
+                    >✕</span>
+                  </div>
                 )}
               </div>
             )}
@@ -513,7 +544,7 @@ const App: React.FC = () => {
               client={selectedClient}
               table={selectedTable}
               row={win.content.row}
-              onSaved={(colName, newValue, originalRow) => {
+              onSaved={(colName, newValue, originalRow, duration) => {
                 closeFloating(win.id);
                 setRows((prev) =>
                   prev.map((r) => {
@@ -523,6 +554,7 @@ const App: React.FC = () => {
                     return r;
                   })
                 );
+                addToast('success', 'Saved successfully', duration);
               }}
             />
           )}
@@ -547,6 +579,7 @@ const App: React.FC = () => {
           {win.type === 'preset-query' && (
             <PresetQueryContent
               preset={win.content.preset}
+              initialArgs={win.content.initialArgs}
               onExecute={handlePresetExecute}
               onClose={() => closeFloating(win.id)}
             />
@@ -570,7 +603,7 @@ const App: React.FC = () => {
 
       <ClientManagerModal
         open={showClientManager}
-        onClose={() => setShowClientManager(false)}
+        onClose={() => { setShowClientManager(false); refreshClients(); }}
         onSaved={refreshClients}
       />
       <AboutModal
@@ -589,6 +622,22 @@ const App: React.FC = () => {
             loadTableData();
           }}
         />
+      )}
+
+      {/* Query indicator tooltip — portal so it escapes overflow:hidden parents */}
+      {queryTooltipPos && activePresetQuery && activePresetQuery.arguments.length > 0 && ReactDOM.createPortal(
+        <div
+          className="query-indicator-tooltip"
+          style={{ position: 'fixed', top: queryTooltipPos.top, left: queryTooltipPos.left, zIndex: 9999 }}
+        >
+          {activePresetQuery.arguments.map((arg) => (
+            <div key={arg.name} className="query-indicator-tooltip-row">
+              <span className="query-tooltip-key">{arg.name}:</span>
+              <span className="query-tooltip-value">{activePresetArgs[arg.name] || '(empty)'}</span>
+            </div>
+          ))}
+        </div>,
+        document.body
       )}
     </div>
   );

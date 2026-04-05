@@ -99,7 +99,7 @@ const TransposeView: React.FC<TransposeViewProps> = ({
               <tr>
                 <th className="field-label" style={{ minWidth: 140 }}>Column</th>
                 {rows.map((row, ri) => (
-                  <th key={ri} style={{ textAlign: 'center', minWidth: 120, width: colWidths[ri] ? `${colWidths[ri]}px` : undefined, position: 'relative' }}>
+                  <th key={ri} style={{ textAlign: 'center', minWidth: 120, width: colWidths[ri] ? `${colWidths[ri]}px` : undefined }}>
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Row {ri + 1}</span>
                     <button
                       className="row-menu-btn"
@@ -209,7 +209,7 @@ const TransposeView: React.FC<TransposeViewProps> = ({
           <div className="col-tooltip-row">
             <span className="col-tooltip-label">Type</span>
             <span className="col-tooltip-value">
-              {(() => {
+              {((): string => {
                 const t = tooltip.meta.DATA_TYPE as string;
                 const p = tooltip.meta.DATA_PRECISION;
                 const s = tooltip.meta.DATA_SCALE;

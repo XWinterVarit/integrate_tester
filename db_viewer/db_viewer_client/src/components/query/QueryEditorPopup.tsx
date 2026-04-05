@@ -139,7 +139,7 @@ const QueryEditorPopup: React.FC<QueryEditorPopupProps> = ({ initial, client, ta
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-editor modal-editor-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-editor-header">
           <button className="modal-close-btn" onClick={onClose}>✕</button>

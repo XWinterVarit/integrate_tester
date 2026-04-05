@@ -127,16 +127,6 @@ const PresetQueryPanel: React.FC<PresetQueryPanelProps> = ({
         <button className="secondary" onClick={() => setOpen(!open)}>
           Preset Queries
         </button>
-        {activePreset && (
-          <button
-            className="secondary"
-            onClick={handleClearPreset}
-            style={{ marginLeft: 4, fontSize: 11 }}
-            title="Clear active preset query"
-          >
-            ✕ Clear
-          </button>
-        )}
         {open && (
           <div className="preset-dropdown-menu">
             {/* Sticky top: search */}

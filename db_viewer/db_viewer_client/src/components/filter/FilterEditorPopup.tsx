@@ -97,7 +97,7 @@ const FilterEditorPopup: React.FC<FilterEditorPopupProps> = ({ initial, allColum
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-editor" onClick={(e) => e.stopPropagation()}>
         <div className="modal-editor-header">
           <button className="modal-close-btn" onClick={onClose}>✕</button>

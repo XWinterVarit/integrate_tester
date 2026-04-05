@@ -3,14 +3,15 @@ import { PresetQuery } from '../../types';
 
 interface PresetQueryContentProps {
   preset: PresetQuery;
+  initialArgs?: Record<string, string>;
   onExecute: (query: string, args: Record<string, string>, preset: PresetQuery | null) => void;
   onClose: () => void;
 }
 
-const PresetQueryContent: React.FC<PresetQueryContentProps> = ({ preset, onExecute, onClose }) => {
+const PresetQueryContent: React.FC<PresetQueryContentProps> = ({ preset, initialArgs, onExecute, onClose }) => {
   const [argValues, setArgValues] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
-    preset.arguments.forEach((a) => { defaults[a.name] = ''; });
+    preset.arguments.forEach((a) => { defaults[a.name] = initialArgs?.[a.name] ?? ''; });
     return defaults;
   });
 

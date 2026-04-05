@@ -4,6 +4,32 @@ import { Row } from '../../types';
 import { FilteredColumn } from '../../utils/filterColumns';
 import { useScrollShadow } from '../../hooks/useScrollShadow';
 
+// Wrap commentary text into short lines (≤ maxLen chars) so the vertical
+// label doesn't grow too tall. Each '\n' becomes a new vertical column when
+// CSS writing-mode: vertical-rl + white-space: pre-wrap is active.
+function wrapCommentaryText(text: string, maxLen: number = 10): string {
+  const words = (text || '').split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxLen) {
+      current = candidate;
+    } else {
+      if (current) { lines.push(current); current = ''; }
+      // hyphenate words that exceed the limit
+      let remaining = word;
+      while (remaining.length > maxLen) {
+        lines.push(remaining.slice(0, maxLen - 1) + '-');
+        remaining = remaining.slice(maxLen - 1);
+      }
+      current = remaining;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.join('\n');
+}
+
 interface TooltipState {
   meta: Record<string, any>;
   colName: string;
@@ -109,9 +135,14 @@ const DataTable: React.FC<DataTableProps> = ({
                 return <th key={`space-${i}`} className="filter-space-col"></th>;
               }
               if (item.type === 'commentary') {
+                const lines = wrapCommentaryText(item.text || '').split('\n');
                 return (
                   <th key={`comment-${i}`} className="filter-commentary-col">
-                    <span className="commentary-label">{item.text}</span>
+                    <span className="commentary-label">
+                      {lines.map((line, li) => (
+                        <span key={li} className="commentary-word">{line}</span>
+                      ))}
+                    </span>
                   </th>
                 );
               }
@@ -225,7 +256,7 @@ const DataTable: React.FC<DataTableProps> = ({
         <div className="col-tooltip-row">
           <span className="col-tooltip-label">Type</span>
           <span className="col-tooltip-value">
-            {(() => {
+            {((): string => {
               const t = tooltip.meta.DATA_TYPE as string;
               const p = tooltip.meta.DATA_PRECISION;
               const s = tooltip.meta.DATA_SCALE;
